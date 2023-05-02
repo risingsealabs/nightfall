@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: nightfall
+Upstream-Contact: Qredo Ltd. <support@qredo.com>
+Source: qredo.com
+
+Files: * 
+Copyright: 2023 Qredo Ltd.
+License: Apache-2.0
