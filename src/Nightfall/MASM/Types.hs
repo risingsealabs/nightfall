@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Nightfall.MASM.Types where
 
