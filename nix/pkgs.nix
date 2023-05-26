@@ -5,29 +5,43 @@ let
   };
 
   config = {
-    packageOverrides = pkgs: {
-      haskellPackages = pkgs.haskellPackages.extend (self: super: with pkgs.haskell.lib; {
-        nightfall = self.callCabal2nix "nightfall" ../. {};
-      });
+    packageOverrides = pkgs: with pkgs.haskell.lib;
+      let
+        # https://github.com/NixOS/nixpkgs/issues/140774#issuecomment-1371565125
+        # https://github.com/NixOS/nixpkgs/issues/220647
+        fixCyclicReference = drv: overrideCabal drv (_: { enableSeparateBinOutput = false; });
+      in {
+        haskell = pkgs.haskell // {
+          packages = pkgs.haskell.packages // {
+            ghc94 = pkgs.haskell.packages.ghc94.override(old: {
+              overrides = pkgs.lib.composeExtensions (old.overrides or (_: _: {})) (self: super: {
+                ghcid = fixCyclicReference(dontCheck super.ghcid); # some tests are non-reproducible from measuring time
+                nightfall = self.callCabal2nix "nightfall" ../. {};
+              });
+            });
+          };
+        };
     };
   };
 
   nixpkgs = import nixpkgsSrc { inherit config; };
 
-  shell = nixpkgs.haskellPackages.shellFor {
+  shell = nixpkgs.haskell.packages.ghc94.shellFor {
     strictDeps = true;
     packages = p: [ p.nightfall ];
     withHoogle = true;
     nativeBuildInputs =
-      let hask = with nixpkgs.haskellPackages; [
+      let hask = with nixpkgs.haskell.packages.ghc94; [
         cabal-install
         ghcid
         (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
       ];
-      in hask ++ [
+      in with nixpkgs; hask ++ [
         nixpkgs.zlib
       ];
   };
 in
 
-{ inherit nixpkgs shell; }
+{ inherit nixpkgs shell;
+  inherit (nixpkgs.haskell.packages.ghc94) nightfall;
+}
