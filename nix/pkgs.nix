@@ -1,7 +1,7 @@
 let
-  nixpkgsSrc = builtins.fetchTarball {
+  nixpkgs-src = builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/0d1b9472176bb31fa1f9a7b86ccbb20c656e6792.tar.gz"; # haskell-updates 23/03/23
-    sha256 = "0j7y0s691xjs2146pkssz5wd3dc5qkvzx106m911anvzd08dbx9f";
+    sha256 = "sha256:0j7y0s691xjs2146pkssz5wd3dc5qkvzx106m911anvzd08dbx9f";
   };
 
   config = {
@@ -24,7 +24,7 @@ let
     };
   };
 
-  nixpkgs = import nixpkgsSrc { inherit config; };
+  nixpkgs = import nixpkgs-src { inherit config; };
 
   shell = nixpkgs.haskell.packages.ghc94.shellFor {
     strictDeps = true;
@@ -32,12 +32,12 @@ let
     withHoogle = true;
     nativeBuildInputs =
       let hask = with nixpkgs.haskell.packages.ghc94; [
-        cabal-install
+        (import ./cabal-multi-repl.nix).cabal-install
         ghcid
         (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
       ];
       in with nixpkgs; hask ++ [
-        nixpkgs.zlib
+        zlib
       ];
   };
 in
