@@ -38,10 +38,31 @@ let
       ];
       in with nixpkgs; hask ++ [
         zlib
+        rustc
+        miden
       ];
+  };
+
+  miden = nixpkgs.rustPlatform.buildRustPackage rec {
+    pname = "miden";
+    version = "985a7aff51fb98cebe3cd82b4371d14f9a3b8376";
+    src = nixpkgs.fetchFromGitHub {
+      owner = "0xPolygonMiden";
+      repo = "miden-vm";
+      rev = "985a7aff51fb98cebe3cd82b4371d14f9a3b8376";
+      sha256 = "sha256-MN/LD2Z6VRHW+iXM722Fcmb/rLwGjSVYmxvPI+BySvw=";
+    };
+    cargoLock.lockFile = ./miden_cargo.lock;
+    postPatch = ''
+      ln -s ${./miden_cargo.lock} Cargo.lock
+    '';
+    buildType = "release";
+    buildFeatures = [ "executable" "concurrent" ];
+    nativeBuildInputs = with nixpkgs; [ rustc ];
+    doCheck = false;
   };
 in
 
-{ inherit nixpkgs shell;
+{ inherit nixpkgs shell miden;
   inherit (nixpkgs.haskell.packages.ghc94) nightfall;
 }
