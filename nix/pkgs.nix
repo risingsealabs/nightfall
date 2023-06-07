@@ -45,12 +45,12 @@ let
 
   miden = nixpkgs.rustPlatform.buildRustPackage rec {
     pname = "miden";
-    version = "985a7aff51fb98cebe3cd82b4371d14f9a3b8376";
+    version = "0.5.0";
     src = nixpkgs.fetchFromGitHub {
       owner = "0xPolygonMiden";
       repo = "miden-vm";
-      rev = "985a7aff51fb98cebe3cd82b4371d14f9a3b8376";
-      sha256 = "sha256-MN/LD2Z6VRHW+iXM722Fcmb/rLwGjSVYmxvPI+BySvw=";
+      rev = "v${version}";
+      sha256 = "sha256-bDILZ8vvxjB/JN6tyhTNKxjQB/35M47grxFqToesH9E=";
     };
     cargoLock.lockFile = ./miden_cargo.lock;
     postPatch = ''
