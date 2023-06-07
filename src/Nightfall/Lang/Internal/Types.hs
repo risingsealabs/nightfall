@@ -57,6 +57,9 @@ instance Num a => Num (Expr a) where
 data Statement_ =
     -- | Variable declaration
       DeclVariable VarName Expr_  -- ^ let a = 634
+    
+    -- | Variable assignment
+    | AssignVar VarName Expr_     -- ^ a <- 368
 
     -- | Conditionals
     | IfElse Expr_ [Statement_] [Statement_] -- ^ condition if-block else-block
@@ -146,12 +149,18 @@ varB = Expr . VarB
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
 
--- ** Variable declaration with value
+-- ** Variables
 declareVarF :: VarName -> Expr Felt -> Statement
 declareVarF varname (Expr e) = Statement $ DeclVariable varname e
 
 declareVarB :: VarName -> Expr Bool -> Statement
 declareVarB varname (Expr e) = Statement $ DeclVariable varname e
+
+assignVarF :: VarName -> Expr Felt -> Statement
+assignVarF varname (Expr e) = Statement $ AssignVar varname e
+
+assignVarB :: VarName -> Expr Bool -> Statement
+assignVarB varname (Expr e) = Statement $ AssignVar varname e
 
 ifElse :: Expr Bool -> [Statement] -> [Statement] -> Statement
 ifElse (Expr cond) ifBlock elseBlock = Statement $ IfElse cond (coerce ifBlock) (coerce elseBlock)

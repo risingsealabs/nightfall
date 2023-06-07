@@ -104,6 +104,26 @@ transpileStatement (DeclVariable varname e) = do
     -- Add Miden's instructions to load the value in global memory
     -- return . singleton . MASM.MemStore . Just . fromIntegral $ pos
 
+-- | Assigning a new value to a variable if just erasing the memory location
+transpileStatement (AssignVar varname e) = do
+    vars <- gets variables
+    shouldTrace <- gets (cfgTraceVariablesUsage . config)
+
+    -- Check that this variable exists (has been declared before)
+    unless (Map.member varname vars) $ do
+        error $ "Variable \"" ++ varname ++ "\" has not been declared before: can't assign value"
+    
+    -- Fetch the memory location for that variable
+    let (Just pos) = Map.lookup varname vars -- safe to patter match Just since we checked with Map.member before
+
+    -- Trace the variable usage if configured
+        traceVar = [MASM.Comment $ "var " <> Text.pack varname | shouldTrace]
+    
+    e' <- transpileExpr e
+
+    addCycles mem_storeCycles'
+    return $ e' <> traceVar <> [ MASM.MemStore . Just . fromIntegral $ pos ]
+
 -- | A (naked) function call is done by pushing the argument on the stack and caling the procedure name
 transpileStatement (NakedCall fname args) = do
     args' <- concat <$> mapM transpileExpr args

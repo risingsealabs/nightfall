@@ -4,10 +4,10 @@ module Examples.Simple ( trivial1Prog
                        , trivial4Prog
                        , simpleVar1Prog
                        , simpleVar2Prog
+                       , simpleVar3Prog
                        ) where
 
 import Nightfall.Lang.Types
-import Nightfall.Lang.Internal.Types ( ZKProgram (..) ) -- Yeah I know, I should not. I should have a mkProgram or smth (TODO)
 
 -- * Simplest, most trivial program that adds to fixed numbers, no variable, no inputs (public or secret)
 
@@ -151,3 +151,17 @@ simpleVar2Prog = ZKProgram { pName = "simple var 2"
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
+
+-- * Simple program that overwrite the values of a variable several times
+
+simpleVar3Stmts :: [Statement]
+simpleVar3Stmts = [ comment "Rewrite on the same variable several times"
+                  , comment "a = 10, b = 20, a = 50, a + b. Should return 70"
+                  , declareVarF "a" 10
+                  , declareVarF "b" 20
+                  , assignVarF "a" 50
+                  , ret . Just $ varF "a" + varF "b"
+                  ]
+
+simpleVar3Prog :: ZKProgram
+simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Stmts

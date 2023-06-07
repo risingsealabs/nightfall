@@ -16,6 +16,7 @@ main = do
                                 , ("trivial4", trivial4Prog)
                                 , ("simpleVar1", simpleVar1Prog)
                                 , ("simpleVar2", simpleVar2Prog)
+                                , ("simpleVar3", simpleVar3Prog)
                                 , ("simpleIf", simpleIfProg)
                                 , ("ifVar", ifVarProg)
                                 , ("simpleInf", simpleInfProg)

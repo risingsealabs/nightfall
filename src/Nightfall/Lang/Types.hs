@@ -23,6 +23,8 @@ module Nightfall.Lang.Types ( Felt
                             -- , fcall
                             , declareVarF
                             , declareVarB
+                            , assignVarF
+                            , assignVarB
                             , ifElse
                             , simpleIf
                             -- , nakedCall
