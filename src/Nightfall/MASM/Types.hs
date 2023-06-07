@@ -64,6 +64,7 @@ data Instruction
   | Gt -- gt
   | Gte -- gte
   | Not -- not
+  | IsOdd -- is_odd
   | LocStore Word32 -- loc_store.i
   | LocLoad Word32 -- loc_load.i
   | MemLoad (Maybe Word32) -- mem_load[.i]

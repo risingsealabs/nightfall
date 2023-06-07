@@ -84,6 +84,7 @@ ppInstr Lt = "lt"
 ppInstr Lte = "lte"
 ppInstr Gt = "gt"
 ppInstr Gte = "gte"
+ppInstr IsOdd = "is_odd"
 ppInstr (Add Nothing) = "add"
 ppInstr (Add (Just n)) = [ "add." ++ show n ]
 ppInstr (Sub Nothing) = "sub"

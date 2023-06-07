@@ -5,6 +5,8 @@ import Control.Monad.State
 import Nightfall.Targets.Miden
 import Examples.Simple
 import Examples.Cond
+import Examples.Loops
+import Examples.Fun
 import Data.Map as Map
 import System.Environment (getArgs, getProgName)
 
@@ -20,6 +22,8 @@ main = do
                                 , ("simpleIf", simpleIfProg)
                                 , ("ifVar", ifVarProg)
                                 , ("simpleInf", simpleInfProg)
+                                , ("sumTo10", sumTo10Prog)
+                                , ("collatzFixed", collatzFixedProg)
                                 ]
     
     args <- getArgs

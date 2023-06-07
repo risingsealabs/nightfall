@@ -18,6 +18,7 @@ module Nightfall.Lang.Types ( Felt
                             , lte
                             , gt
                             , gte
+                            , isOdd
                             , varF
                             , varB
                             -- , fcall
@@ -27,6 +28,7 @@ module Nightfall.Lang.Types ( Felt
                             , assignVarB
                             , ifElse
                             , simpleIf
+                            , while
                             -- , nakedCall
                             , ret
                             , comment

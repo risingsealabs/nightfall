@@ -25,11 +25,12 @@ data Expr_ =
 
     -- | Boolean operations
     | Equal Expr_ Expr_     -- ^ a == b
-    | Not Expr_            -- ^ !a
+    | Not Expr_             -- ^ !a
     | Lower Expr_ Expr_     -- ^ a < b
     | LowerEq Expr_ Expr_   -- ^ a <= b
     | Greater Expr_ Expr_   -- ^ a > b
     | GreaterEq Expr_ Expr_ -- ^ a >= b
+    | IsOdd Expr_           -- a `mod` 2 == 1
     
     -- | Variables
     | VarF VarName     -- ^ "calling" a variable of type Felt by its name (e.g. "foo")
@@ -63,6 +64,7 @@ data Statement_ =
 
     -- | Conditionals
     | IfElse Expr_ [Statement_] [Statement_] -- ^ condition if-block else-block
+    | While Expr_ [Statement_]               -- ^ condition body
 
     -- | Naked function call
     | NakedCall FunName [Expr_]
@@ -136,6 +138,9 @@ gt (Expr e1) (Expr e2) = Expr $ Greater e1 e2
 gte :: Ord a => Expr a -> Expr a -> Expr Bool
 gte(Expr e1) (Expr e2) = Expr $ GreaterEq e1 e2
 
+isOdd :: Num a => Expr a -> Expr Bool
+isOdd (Expr e) = Expr $ IsOdd e
+
 -- ** Variables (typed)
 varF :: VarName -> Expr Felt
 varF = Expr . VarF
@@ -168,6 +173,9 @@ ifElse (Expr cond) ifBlock elseBlock = Statement $ IfElse cond (coerce ifBlock) 
 -- | A constructor for when you don't want 'else' statement
 simpleIf :: Expr Bool -> [Statement] -> Statement
 simpleIf cond ifBlock = ifElse cond ifBlock []
+
+while :: Expr Bool -> [Statement] -> Statement
+while (Expr cond) body = Statement $ While cond (coerce body)
 
 -- nakedCall :: FunName -> [Expr] -> Statement
 -- nakedCall = NakedCall

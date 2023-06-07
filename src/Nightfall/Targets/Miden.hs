@@ -74,6 +74,10 @@ transpileStatement (IfElse cond ifBlock elseBlock) = do
     addCycles (dropCycles + eqCycles')
     cond' <- transpileExpr cond
     return $ cond' <> [ MASM.If ifBlock' elseBlock' ]
+transpileStatement (NFTypes.While cond body) = do
+    body' <- concat <$> mapM transpileStatement body
+    cond' <- transpileExpr cond
+    return $ cond' <> [ MASM.While $ body' <> cond' ]
 -- | Declaring a variable loads the expression into Miden's global memory, and we track the index in memory
 transpileStatement (DeclVariable varname e) = do
     vars <- gets variables
@@ -230,6 +234,9 @@ transpileExpr (NFTypes.Not e) = do
     es <- transpileExpr e
     addCycles notCycles
     return $ es <> [ MASM.Not ]
+transpileExpr (NFTypes.IsOdd e) = do
+    es <- transpileExpr e
+    return $ es <> [ MASM.IsOdd ]
 
 transpileExpr _ = error "transpileExpr::TODO"
 

@@ -25,7 +25,9 @@ library
                       Nightfall.Lang.Types,
                       Nightfall.Targets.Miden,
                       Examples.Simple,
-                      Examples.Cond
+                      Examples.Cond,
+                      Examples.Loops,
+                      Examples.Fun
     other-modules:    Nightfall.Lang.Internal.Types,
     -- other-extensions:
     build-depends:    base >=4.16 && <5
