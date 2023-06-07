@@ -1,34 +1,7 @@
-module Nightfall.Lang.Internal.Types ( Felt
-                            , VarName
-                            , FunName
-                            , Expr(..)
-                            , Statement(..)
-                            , ZKProgram(..)
-                            , lit
-                            , bool
-                            , add
-                            , sub
-                            , mul
-                            , div'
-                            , mod'
-                            , eq
-                            , not'
-                            , lt
-                            , lte
-                            , gt
-                            , gte
-                            , var
-                            , fcall
-                            , declareVar
-                            , ifElse
-                            , simpleIf
-                            , nakedCall
-                            , ret
-                            , comment
-                            , emptyLine
-                            ) where
+module Nightfall.Lang.Internal.Types where
 
 import Data.Word ( Word64 )
+import Data.Coerce ( coerce )
 
 -- | Field Element type
 type Felt = Word64
@@ -37,57 +10,62 @@ type VarName = String
 
 type FunName = String
 
--- | Simple expression type, quite unsafe at the moment
-data Expr =
+-- | Expression, internal type, not exposed
+data Expr_ =
     -- | Literals
       Lit Felt  -- ^ 309183, 2398713, whatever
     | Bo Bool   -- ^ true/false, 1/0 
 
     -- | Arithmetic operations
-    | Add Expr Expr -- ^ a + b
-    | Sub Expr Expr -- ^ a - b
-    | Mul Expr Expr -- ^ a * b
-    | Div Expr Expr -- ^ a / b (integer division)
-    | Mod Expr Expr -- ^ a % b
+    | Add Expr_ Expr_ -- ^ a + b
+    | Sub Expr_ Expr_ -- ^ a - b
+    | Mul Expr_ Expr_ -- ^ a * b
+    | Div Expr_ Expr_ -- ^ a / b (integer division)
+    | Mod Expr_ Expr_ -- ^ a % b
 
     -- | Boolean operations
-    | Equal Expr Expr     -- ^ a == b
-    | Not Expr            -- ^ !a
-    | Lower Expr Expr     -- ^ a < b
-    | LowerEq Expr Expr   -- ^ a <= b
-    | Greater Expr Expr   -- ^ a > b
-    | GreaterEq Expr Expr -- ^ a >= b
+    | Equal Expr_ Expr_     -- ^ a == b
+    | Not Expr_            -- ^ !a
+    | Lower Expr_ Expr_     -- ^ a < b
+    | LowerEq Expr_ Expr_   -- ^ a <= b
+    | Greater Expr_ Expr_   -- ^ a > b
+    | GreaterEq Expr_ Expr_ -- ^ a >= b
     
-    -- | Variable
-    | Var VarName     -- ^ "calling" a variable by its name (e.g. "foo")
+    -- | Variables
+    | VarF VarName     -- ^ "calling" a variable of type Felt by its name (e.g. "foo")
+    | VarB VarName     -- ^ same, but with boolean variable
 
     -- | Functions
-    | FCall FunName [Expr]
+    | FCall FunName [Expr_]
     deriving (Eq, Show)
-  
--- | Num instance to make writing easier. Yes I know this makes little sense since @Expr is not type-safe
-instance Num Expr where
-  (+) = Add
-  (*) = Mul
-  abs e = e
-  signum = error "Signum not implemented for Expr"
-  -- fromInteger = error "fromInteger not implemented for Expr"
-  fromInteger = lit . fromInteger
-  (-) = Sub
 
--- | Simple statement type, also unsafe and very basic
-data Statement =
+-- | Expression wrapper type, typed for safety, exposed to use
+newtype Expr a = Expr Expr_
+  deriving (Eq, Show)
+
+-- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
+instance Num a => Num (Expr a) where
+  (+) = add
+  (-) = sub
+  (*) = mul
+  abs = id
+  -- fromInteger x = Expr (Lit (fromInteger x))
+  fromInteger = Expr . Lit . fromInteger
+  signum _ = error "Signum not implemented for Expr"
+
+-- | Simple, internal type, not exposed
+data Statement_ =
     -- | Variable declaration
-      DeclVariable VarName Expr  -- ^ let a = 634
+      DeclVariable VarName Expr_  -- ^ let a = 634
 
     -- | Conditionals
-    | IfElse Expr [Statement] [Statement] -- ^ condition if-block else-block
+    | IfElse Expr_ [Statement_] [Statement_] -- ^ condition if-block else-block
 
     -- | Naked function call
-    | NakedCall FunName [Expr]
+    | NakedCall FunName [Expr_]
 
     -- | Return
-    | Return (Maybe Expr)
+    | Return (Maybe Expr_)
 
     -- | Comment
     | Comment String
@@ -96,6 +74,10 @@ data Statement =
     | EmptyLine
     deriving (Eq, Show)
 
+-- | Statement wrapper type, typed for safety, exposed to use
+newtype Statement = Statement Statement_
+  deriving (Eq, Show)
+
 data ZKProgram = ZKProgram
     { pName :: String            -- ^ Program name, is this needed?
     , pStatements :: [Statement] -- ^ List of statements comprising the program
@@ -103,74 +85,90 @@ data ZKProgram = ZKProgram
     , pSecretInputs :: FilePath  -- ^ For now, for simplicty, we'll be referring to a '.inputs' file
     }
 
--- * "Smart Constructors" for building (type-safe) @Expr. They are the ones exposed for users to use
--- NOTE: most of them are still unsafe at this point, this is more a placeholder for when we switch to
--- a better structure, (internal, unexposed 'Expr_' type, then newtype Expr a, etc.)
-lit :: Word64 -> Expr
-lit = Lit
+-- * "Smart Constructors" for building (type-safe) @Expr. They are the ones exposed for users to use instead of constructing the
+-- types directly.
 
-bool :: Bool -> Expr
-bool = Bo
+-- ** Literals
 
-add :: Expr -> Expr -> Expr
-add  = Add
+lit :: Word64 -> Expr Felt
+lit = Expr . Lit
 
-sub :: Expr -> Expr -> Expr
-sub = Sub
+bool :: Bool -> Expr Bool
+bool = Expr . Bo
 
-mul :: Expr -> Expr -> Expr
-mul = Mul
+-- ** Arithmetic operations
 
-div' :: Expr -> Expr -> Expr
-div' = Div
+add :: Num a => Expr a -> Expr a -> Expr a
+add  (Expr e1) (Expr e2) = Expr $ Add e1 e2
 
-mod' :: Expr -> Expr -> Expr
-mod' = Mod
+sub :: Num a => Expr a -> Expr a -> Expr a
+sub (Expr e1) (Expr e2)= Expr $ Sub e1 e2
 
-eq :: Expr -> Expr -> Expr
-eq = Equal
+mul :: Num a => Expr a -> Expr a -> Expr a
+mul (Expr e1) (Expr e2) = Expr $ Mul e1 e2
 
-not' :: Expr -> Expr
-not' = Not
+div' :: Num a => Expr a -> Expr a -> Expr a
+div' (Expr e1) (Expr e2) = Expr $ Div e1 e2
 
-lt :: Expr -> Expr -> Expr
-lt = Lower
+mod' :: Num a => Expr a -> Expr a -> Expr a
+mod' (Expr e1) (Expr e2) = Expr $ Mod e1 e2
 
-lte :: Expr -> Expr -> Expr
-lte = LowerEq
+-- ** Boolean operations
 
-gt :: Expr -> Expr -> Expr
-gt = Greater
+eq :: Eq a => Expr a -> Expr a -> Expr Bool
+eq (Expr e1) (Expr e2)= Expr $ Equal e1 e2
 
-gte :: Expr -> Expr -> Expr
-gte = GreaterEq
+not' :: Expr Bool -> Expr Bool
+not' (Expr e) = Expr $ Not e
 
-var :: VarName -> Expr
-var = Var
+lt :: Ord a => Expr a -> Expr a -> Expr Bool
+lt (Expr e1) (Expr e2)= Expr $ Lower e1 e2
 
-fcall :: FunName -> [Expr] -> Expr
-fcall = FCall
+lte :: Ord a => Expr a -> Expr a -> Expr Bool
+lte (Expr e1) (Expr e2) = Expr $ LowerEq e1 e2
+
+gt :: Ord a => Expr a -> Expr a -> Expr Bool
+gt (Expr e1) (Expr e2) = Expr $ Greater e1 e2
+
+gte :: Ord a => Expr a -> Expr a -> Expr Bool
+gte(Expr e1) (Expr e2) = Expr $ GreaterEq e1 e2
+
+-- ** Variables (typed)
+varF :: VarName -> Expr Felt
+varF = Expr . VarF
+
+varB :: VarName -> Expr Bool
+varB = Expr . VarB
+
+-- Function calls will come later
+-- fcall :: FunName -> [Expr] -> Expr
+-- fcall = FCall
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
--- NOTE: same as above: it's trivial right now, and not really type safe or anything. It's just placeholder
-declareVar :: VarName -> Expr -> Statement
-declareVar = DeclVariable
 
-ifElse :: Expr -> [Statement] -> [Statement] -> Statement
-ifElse = IfElse
+-- ** Variable declaration with value
+declareVarF :: VarName -> Expr Felt -> Statement
+declareVarF varname (Expr e) = Statement $ DeclVariable varname e
+
+declareVarB :: VarName -> Expr Bool -> Statement
+declareVarB varname (Expr e) = Statement $ DeclVariable varname e
+
+ifElse :: Expr Bool -> [Statement] -> [Statement] -> Statement
+ifElse (Expr cond) ifBlock elseBlock = Statement $ IfElse cond (coerce ifBlock) (coerce elseBlock)
 
 -- | A constructor for when you don't want 'else' statement
-simpleIf :: Expr -> [Statement] -> Statement
-simpleIf cond body = IfElse cond body []
+simpleIf :: Expr Bool -> [Statement] -> Statement
+simpleIf cond ifBlock = ifElse cond ifBlock []
 
-nakedCall :: FunName -> [Expr] -> Statement
-nakedCall = NakedCall
+-- nakedCall :: FunName -> [Expr] -> Statement
+-- nakedCall = NakedCall
 
-ret :: Maybe Expr -> Statement
-ret = Return
+ret :: Maybe (Expr a)-> Statement
+ret Nothing = Statement $ Return Nothing
+ret (Just (Expr e)) = Statement $ Return (Just e)
 
 comment :: String -> Statement
-comment = Comment
+comment = Statement . Comment
 
 emptyLine :: Statement
-emptyLine = EmptyLine
+emptyLine = Statement EmptyLine

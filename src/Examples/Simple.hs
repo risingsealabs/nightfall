@@ -109,8 +109,8 @@ simpleVar1Stmts :: [Statement]
 simpleVar1Stmts = [ comment "Simple addition, but with a variable storing a value"
                  , comment "a = 999"
                  , comment "a + 1. It should return 1000"
-                 , declareVar "a" (lit 999)
-                 , ret . Just $ add (var "a") (lit 1)
+                 , declareVarF "a" (lit 999)
+                 , ret . Just $ add (varF "a") (lit 1)
                  ]
 
 simpleVar1Prog :: ZKProgram
@@ -139,10 +139,10 @@ simpleVar2Stmts = [ comment "Simple subtraction, but uses three variables"
                  , comment "a = 888, b = 222"
                  , comment "c = a - b. Return c"
                  , comment "It should return 666"
-                 , declareVar "a" 888
-                 , declareVar "b" 222
-                 , declareVar "c" (var "a" - var "b")
-                 , ret . Just $ var "c"
+                 , declareVarF "a" 888
+                 , declareVarF "b" 222
+                 , declareVarF "c" (varF "a" - varF "b")
+                 , ret . Just $ varF "c"
                  ]
 
 simpleVar2Prog :: ZKProgram

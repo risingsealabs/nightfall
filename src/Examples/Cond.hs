@@ -4,7 +4,6 @@ module Examples.Cond ( simpleIfProg
                      ) where
 
 import Nightfall.Lang.Types
-import Nightfall.Lang.Internal.Types ( ZKProgram (..) ) -- Yeah I know, I should not. I should have a mkProgram or smth (TODO)
 
 -- * Simple program that uses one if / else statement
 
@@ -25,11 +24,7 @@ simpleIfStmts = [ comment "Simple, stupid and trivial program that makes uses of
                 ]
 
 simpleIfProg :: ZKProgram
-simpleIfProg = ZKProgram { pName = "simple if"
-                          , pStatements = simpleIfStmts
-                          , pPublicInputs = []
-                          , pSecretInputs = []
-                          }
+simpleIfProg = mkSimpleProgram "simple if" simpleIfStmts
 
 -- * Simple program that uses one if / else statement on a moderately complex computation involving variables
 
@@ -53,21 +48,17 @@ ifVarStmts = [ comment "Makes a if/else comparison on a moderately complex compu
              , comment "It sums a=145 + b=79 and compares equality with target=203."
              , comment "If equal, it returns okVal=10, otherwise nokVal=20"
              , comment "It should return 20"
-             , declareVar "a" 145
-             , declareVar "b" 79
-             , declareVar "target" 203
-             , declareVar "sum" (var "a" + var "b")
-             , declareVar "okVal" 10
-             , declareVar "nokVal" 20
-             , ifElse (var "sum" `eq` var "target") [ret . Just $ var "okVal"] [ret . Just $ var "nokVal"]
+             , declareVarF "a" 145
+             , declareVarF "b" 79
+             , declareVarF "target" 203
+             , declareVarF "sum" (varF "a" + varF "b")
+             , declareVarF "okVal" 10
+             , declareVarF "nokVal" 20
+             , ifElse (varF "sum" `eq` varF "target") [ret . Just $ varF "okVal"] [ret . Just $ varF "nokVal"]
             ]
 
 ifVarProg :: ZKProgram
-ifVarProg = ZKProgram { pName = "If with vars"
-                          , pStatements = ifVarStmts
-                          , pPublicInputs = []
-                          , pSecretInputs = []
-                          }
+ifVarProg = mkSimpleProgram "If with vars" ifVarStmts
 
 -- * Simple program that compares two fixed numbers stored in variables and return the lowest
 
@@ -85,14 +76,10 @@ simpleInfStmts :: [Statement]
 simpleInfStmts = [ comment "if n1=4238 <= n2=21987 then n1 else n2."
                  , comment "It should return 4238"
                  , emptyLine
-                 , declareVar "n1" 4238
-                 , declareVar "n2" 21987
-                 , ifElse (var "n1" `lte` var "n2") [ret . Just $ var "n1"] [ret . Just $ var "n2"]
+                 , declareVarF "n1" 4238
+                 , declareVarF "n2" 21987
+                 , ifElse (varF "n1" `lte` varF "n2") [ret . Just $ varF "n1"] [ret . Just $ varF "n2"]
                  ]
 
 simpleInfProg :: ZKProgram
-simpleInfProg = ZKProgram { pName = "simple inf"
-                          , pStatements = simpleInfStmts
-                          , pPublicInputs = []
-                          , pSecretInputs = []
-                          }
+simpleInfProg = mkSimpleProgram "simple inf" simpleInfStmts

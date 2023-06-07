@@ -4,6 +4,7 @@ module Nightfall.Lang.Types ( Felt
                             , Expr
                             , Statement
                             , ZKProgram(..)
+                            , mkSimpleProgram
                             , lit
                             , bool
                             , add
@@ -17,15 +18,26 @@ module Nightfall.Lang.Types ( Felt
                             , lte
                             , gt
                             , gte
-                            , var
-                            , fcall
-                            , declareVar
+                            , varF
+                            , varB
+                            -- , fcall
+                            , declareVarF
+                            , declareVarB
                             , ifElse
                             , simpleIf
-                            , nakedCall
+                            -- , nakedCall
                             , ret
                             , comment
                             , emptyLine
                             ) where
 
 import Nightfall.Lang.Internal.Types
+
+-- | Helper to quickly make a simple @ZKProgram from a list of statements, no inputs
+mkSimpleProgram :: String -> [Statement] -> ZKProgram
+mkSimpleProgram name stmts = ZKProgram
+    { pName = name
+    , pStatements = stmts
+    , pPublicInputs = []
+    , pSecretInputs = ""
+    }

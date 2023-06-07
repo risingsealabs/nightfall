@@ -30,7 +30,7 @@ main = do
             examples = unlines . Prelude.map ("    "++) . Map.keys $ allProgs
         error $ str ++ examples ++ "\n and [filepath] (optional) is path to write the MASM, otherwise stdout"
     
-    masm <- case Map.lookup (head args) allProgs of
+    (masm, ctx) <- case Map.lookup (head args) allProgs of
         Nothing -> do
             let str = "Example program \"" ++ head args ++ "\" not found. Available ones are:\n"
                 examples = unlines . Prelude.map ("    "++) . Map.keys $ allProgs
@@ -40,9 +40,13 @@ main = do
                                     , cfgTraceVariablesUsage = True
                                     }
                 context = defaultContext { config = cfg }
-            let (midenProg, _) = runState (transpile prog) context
-            return midenProg
+            let (midenProg, ctx) = runState (transpile prog) context
+            return (midenProg, ctx)
     
+    putStrLn $ "\n| Transpilation of program \"" ++ progName ctx ++ "\" finished!"
+    putStrLn $ "|   - Program is estimated to take " ++ show (nbCycles ctx) ++ " execution cycles"
+    putStrLn ""
+
     -- Check if the user provided a path to write the program
     let io = if (length args >= 2)
         then do
