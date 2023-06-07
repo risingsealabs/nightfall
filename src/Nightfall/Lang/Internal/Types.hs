@@ -13,7 +13,7 @@ type FunName = String
 -- | Expression, internal type, not exposed
 data Expr_ =
     -- | Literals
-      Lit Felt  -- ^ 309183, 2398713, whatever
+      Lit Felt  -- ^ 309183, 2398713, whatever NOTE: we might want to use explicit types like W32, W64, etc.?
     | Bo Bool   -- ^ true/false, 1/0 
 
     -- | Arithmetic operations
@@ -38,6 +38,9 @@ data Expr_ =
 
     -- | Functions
     | FCall FunName [Expr_]
+
+    -- | Secret Input
+    | NextSecret       -- ^ The next available secret input
     deriving (Eq, Show)
 
 -- | Expression wrapper type, typed for safety, exposed to use
@@ -151,6 +154,16 @@ varB = Expr . VarB
 -- Function calls will come later
 -- fcall :: FunName -> [Expr] -> Expr
 -- fcall = FCall
+
+-- * Inputs
+
+-- ** Secret input
+
+nextSecretF :: Expr Felt
+nextSecretF = Expr NextSecret
+
+nextSecretB :: Expr Bool
+nextSecretB = Expr NextSecret
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
 

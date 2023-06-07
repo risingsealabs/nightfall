@@ -237,6 +237,7 @@ transpileExpr (NFTypes.Not e) = do
 transpileExpr (NFTypes.IsOdd e) = do
     es <- transpileExpr e
     return $ es <> [ MASM.IsOdd ]
+transpileExpr NextSecret = return . singleton . MASM.AdvPush $ 1
 
 transpileExpr _ = error "transpileExpr::TODO"
 

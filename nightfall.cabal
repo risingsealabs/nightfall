@@ -27,7 +27,8 @@ library
                       Examples.Simple,
                       Examples.Cond,
                       Examples.Loops,
-                      Examples.Fun
+                      Examples.Fun,
+                      Examples.Inputs
     other-modules:    Nightfall.Lang.Internal.Types,
     -- other-extensions:
     build-depends:    base >=4.16 && <5

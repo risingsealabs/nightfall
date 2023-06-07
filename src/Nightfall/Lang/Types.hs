@@ -5,6 +5,7 @@ module Nightfall.Lang.Types ( Felt
                             , Statement
                             , ZKProgram(..)
                             , mkSimpleProgram
+                            , mkZKProgram
                             , lit
                             , bool
                             , add
@@ -22,6 +23,8 @@ module Nightfall.Lang.Types ( Felt
                             , varF
                             , varB
                             -- , fcall
+                            , nextSecretF
+                            , nextSecretB
                             , declareVarF
                             , declareVarB
                             , assignVarF
@@ -44,4 +47,13 @@ mkSimpleProgram name stmts = ZKProgram
     , pStatements = stmts
     , pPublicInputs = []
     , pSecretInputs = ""
+    }
+
+-- | Helper to build a @ZKPeogram
+mkZKProgram :: String -> [Statement] -> [Felt] -> FilePath -> ZKProgram
+mkZKProgram name stmts pubs secretFP = ZKProgram
+    { pName = name
+    , pStatements = stmts
+    , pPublicInputs = pubs
+    , pSecretInputs = secretFP
     }

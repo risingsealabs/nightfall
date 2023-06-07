@@ -7,6 +7,7 @@ import Examples.Simple
 import Examples.Cond
 import Examples.Loops
 import Examples.Fun
+import Examples.Inputs
 import Data.Map as Map
 import System.Environment (getArgs, getProgName)
 
@@ -24,6 +25,8 @@ main = do
                                 , ("simpleInf", simpleInfProg)
                                 , ("sumTo10", sumTo10Prog)
                                 , ("collatzFixed", collatzFixedProg)
+                                , ("collatzPriv", collatzPrivProg)
+                                , ("simpleSecret", simpleSecretProg)
                                 ]
     
     args <- getArgs
