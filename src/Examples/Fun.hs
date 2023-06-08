@@ -56,10 +56,12 @@ collatzPrivStmts = [ comment "Compute the Collatz sequence, starting position ta
                   , declareVarF "start" nextSecretF
                   , declareVarF "n" (varF "start")
                   , declareVarF "length" 1
-                  , while (varF "n" `gt` 1) [ assignVarF "length" (varF "length" + 1)
+                  , while (varF "n" `gt` 1) [ incVarF "length" 1
                                             , ifElse (isOdd (varF "n"))
-                                               [assignVarF "n" (varF "n" * 3 + 1)]
-                                               [assignVarF "n" (varF "n" `div'` 2)]
+                                             --   [assignVarF "n" (varF "n" * 3 + 1)]
+                                                [updateVarF "n" $ \n -> n * 3 + 1]
+                                             --   [assignVarF "n" (varF "n" `div'` 2)]
+                                                [updateVarF "n" $ \n -> n `div'` 2]
                                             ]
                   , ret . Just $ varF "length"
                   ]
