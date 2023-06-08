@@ -41,7 +41,6 @@ data Context = Context
     , memPos :: MemIdx               -- ^ Next free indice in Miden's global memory
     , variables :: Map String MemIdx -- ^ Variables in the EDSL are stored in Miden's random access memory, we keep a map to match them
     , config :: Config               -- ^ Transpilation configuration options
-    , nbCycles :: Integer            -- ^ Number of execution cycles the program will take upon execution (we take upper bounds)
     }
 
 defaultContext :: Context
@@ -50,7 +49,6 @@ defaultContext = Context
     , memPos = 0
     , variables = Map.empty
     , config = defaultConfig
-    , nbCycles = 0
     }
 
 -- | Entry point: transpile a EDSL-described ZK program into a Miden Module
@@ -71,7 +69,6 @@ transpileStatement (IfElse cond ifBlock elseBlock) = do
     elseBlock' <- concat <$> mapM transpileStatement elseBlock
     -- Not entirely sure, Miden talks about a "a small, but non-negligible overhead", but they don't say.
     -- I'm supposing it takes a pop/drop operation + a comparison
-    addCycles (dropCycles + eqCycles')
     cond' <- transpileExpr cond
     return $ cond' <> [ MASM.If ifBlock' elseBlock' ]
 transpileStatement (NFTypes.While cond body) = do
@@ -100,8 +97,6 @@ transpileStatement (DeclVariable varname e) = do
     -- Transpile the variable value
     e' <- transpileExpr e
 
-    addCycles mem_storeCycles'
-
     -- Return instruction for the variable value and instruction to store the value in global memory
     return $ e' <> traceVar <> [ MASM.MemStore . Just . fromIntegral $ pos ]
 
@@ -125,7 +120,6 @@ transpileStatement (AssignVar varname e) = do
     
     e' <- transpileExpr e
 
-    addCycles mem_storeCycles'
     return $ e' <> traceVar <> [ MASM.MemStore . Just . fromIntegral $ pos ]
 
 -- | A (naked) function call is done by pushing the argument on the stack and caling the procedure name
@@ -150,11 +144,9 @@ transpileExpr :: Expr_ -> State Context [Instruction]
 -- transpileExpr (Bo _)  = error "Can't transpile standalone boolean"
 -- | Literals are simply pushed onto the stack
 transpileExpr (Lit felt) = do
-    addCycles pushCycles
     return . singleton . Push . fromIntegral $ felt
 transpileExpr (Bo bo) = do
     let felt = if bo then 1 else 0
-    addCycles pushCycles
     return . singleton . Push $ felt
 
 -- | Using a variable means we fetch the value from (global) memory and push it to the stack
@@ -166,7 +158,6 @@ transpileExpr (VarF varname) = do
         Just idx -> do
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar = [MASM.Comment $ "var " <> Text.pack varname <> " (felt)" | shouldTrace]
-            addCycles mem_loadCycles'
             return $ traceVar <> [MemLoad . Just . fromIntegral $ idx]
 transpileExpr (VarB varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack
@@ -176,29 +167,24 @@ transpileExpr (VarB varname) = do
         Just idx -> do
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar = [MASM.Comment $ "var " <> Text.pack varname <> " (bool)" | shouldTrace]
-            addCycles mem_loadCycles'
             return $ traceVar <> [MemLoad . Just . fromIntegral $ idx]
 
 -- | Arithmetics operations are matched to their corresponding Miden operations
 transpileExpr (NFTypes.Add e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles add_Cycles
     return $ e1s <> e2s <> [ MASM.Add Nothing ]
 transpileExpr (NFTypes.Sub e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles subCycles
     return $ e1s <> e2s <> [ MASM.Sub Nothing ]
 transpileExpr (NFTypes.Mul e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles mulCycles
     return $ e1s <> e2s <> [ MASM.Mul Nothing ]
 transpileExpr (NFTypes.Div e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles divCycles
     return $ e1s <> e2s <> [ MASM.Div Nothing ]
 transpileExpr (NFTypes.Mod e1 e2) = do
     error "No support for simple 'mod' function in Miden"
@@ -208,31 +194,25 @@ transpileExpr (NFTypes.Mod e1 e2) = do
 transpileExpr (Equal e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles eqCycles
     return $ e1s <> e2s <> [ MASM.Eq Nothing ]
 transpileExpr (Lower e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles ltCycles
     return $ e1s <> e2s <> [ MASM.Lt ]
 transpileExpr (LowerEq e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles lteCycles
     return $ e1s <> e2s <> [ MASM.Lte ]
 transpileExpr (Greater e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles gtCycles
     return $ e1s <> e2s <> [ MASM.Gt ]
 transpileExpr (GreaterEq e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
-    addCycles gteCycles
     return $ e1s <> e2s <> [ MASM.Gte ]
 transpileExpr (NFTypes.Not e) = do
     es <- transpileExpr e
-    addCycles notCycles
     return $ es <> [ MASM.Not ]
 transpileExpr (NFTypes.IsOdd e) = do
     es <- transpileExpr e
@@ -240,31 +220,3 @@ transpileExpr (NFTypes.IsOdd e) = do
 transpileExpr NextSecret = return . singleton . MASM.AdvPush $ 1
 
 transpileExpr _ = error "transpileExpr::TODO"
-
--- | Helper function to increment the number of VM cycles in the state
-addCycles :: Integer -> State Context ()
-addCycles n = modify $ \ctx -> ctx { nbCycles = n + nbCycles ctx }
-
--- ** Execution cycles as advertised by Miden VM's doc
-
-pushCycles = 1
-mem_loadCycles = 1
-mem_loadCycles' = 2
-mem_storeCycles = 2
-mem_storeCycles' = 4
-add_Cycles = 1
-add_Cycles' = 2
-subCycles = 2
-subCycles' = 2
-mulCycles = 1
-mulCycles' = 2
-divCycles = 2
-divCycles' = 2
-eqCycles = 1
-eqCycles' = 2
-ltCycles = 17
-lteCycles = 18
-gtCycles = 18
-gteCycles = 19
-notCycles = 1
-dropCycles = 1

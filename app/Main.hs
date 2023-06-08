@@ -50,10 +50,6 @@ main = do
                 context = defaultContext { config = cfg }
             let (midenProg, ctx) = runState (transpile prog) context
             return (midenProg, ctx)
-    
-    putStrLn $ "\n| Transpilation of program \"" ++ progName ctx ++ "\" finished!"
-    putStrLn $ "|   - Program is estimated to take " ++ show (nbCycles ctx) ++ " execution cycles"
-    putStrLn ""
 
     -- Check if the user provided a path to write the program
     let io = if (length args >= 2)
