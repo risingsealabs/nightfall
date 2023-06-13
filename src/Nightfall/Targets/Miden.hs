@@ -187,11 +187,15 @@ transpileExpr (NFTypes.Div e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
     return $ e1s <> e2s <> [ MASM.Div Nothing ]
-transpileExpr (NFTypes.Mod e1 e2) = do
+transpileExpr (NFTypes.Mod _ _) = do
     error "No support for simple 'mod' function in Miden"
     -- e1s <- transpileExpr e1
     -- e2s <- transpileExpr e2
     -- return $ e1s <> e2s <> [ MASM.Mod? Nothing ]
+transpileExpr (NFTypes.IDiv32 e1 e2) = do
+    e1s <- transpileExpr e1
+    e2s <- transpileExpr e2
+    return $ e1s <> e2s <> [ MASM.IDiv ]
 transpileExpr (Equal e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2

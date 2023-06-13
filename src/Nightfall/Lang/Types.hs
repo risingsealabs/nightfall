@@ -13,6 +13,7 @@ module Nightfall.Lang.Types ( Felt
                             , mul
                             , div'
                             , mod'
+                            , idiv32
                             , eq
                             , not'
                             , lt
@@ -118,6 +119,9 @@ div' (Expr e1) (Expr e2) = Expr $ Div e1 e2
 
 mod' :: Num a => Expr a -> Expr a -> Expr a
 mod' (Expr e1) (Expr e2) = Expr $ Mod e1 e2
+
+idiv32 :: Integral a => Expr a -> Expr a -> Expr a
+idiv32 (Expr e1) (Expr e2) = Expr $ IDiv32 e1 e2
 
 -- ** Boolean operations
 

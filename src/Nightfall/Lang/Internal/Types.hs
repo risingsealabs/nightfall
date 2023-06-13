@@ -21,6 +21,7 @@ data Expr_ =
     | Mul Expr_ Expr_ -- ^ a * b
     | Div Expr_ Expr_ -- ^ a / b (integer division)
     | Mod Expr_ Expr_ -- ^ a % b
+    | IDiv32 Expr_ Expr_ -- ^ a `quot` b with a and b 32-bit integers
 
     -- | Boolean operations
     | Equal Expr_ Expr_     -- ^ a == b
