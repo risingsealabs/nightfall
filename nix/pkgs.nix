@@ -1,7 +1,9 @@
 let
   nixpkgs-src = builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/0d1b9472176bb31fa1f9a7b86ccbb20c656e6792.tar.gz"; # haskell-updates 23/03/23
-    sha256 = "sha256:0j7y0s691xjs2146pkssz5wd3dc5qkvzx106m911anvzd08dbx9f";
+    # cherry-pick of https://github.com/NixOS/nixpkgs/pull/224542
+    # on top of merge of https://github.com/NixOS/nixpkgs/pull/237746
+    url = "https://github.com/qrlex/nixpkgs/archive/301a63455028ce683abb2663f36a0fa1464e2e13.tar.gz";
+    sha256 = "sha256:14kxgssgy7pa92wnj2vhsv5jy0qf4kdwnsrsw8272x76531525cw";
   };
 
   config = {
@@ -13,26 +15,55 @@ let
       in {
         haskell = pkgs.haskell // {
           packages = pkgs.haskell.packages // {
-            ghc94 = pkgs.haskell.packages.ghc94.override(old: {
-              overrides = pkgs.lib.composeExtensions (old.overrides or (_: _: {})) (self: super: {
-                ghcid = fixCyclicReference(dontCheck super.ghcid); # some tests are non-reproducible from measuring time
-                nightfall = self.callCabal2nix "nightfall" ../. {};
-              });
+            ghc96 = pkgs.haskell.packages.ghc96.override(old: {
+              overrides = pkgs.lib.fold pkgs.lib.composeExtensions (old.overrides or (_: _: {})) [
+
+                (self: super: {
+                  nightfall = self.callCabal2nix "nightfall" ../. {};
+                })
+
+                # ghcid overrides
+                (self: super: {
+                  # some tests are non-reproducible from measuring time
+                  ghcid = fixCyclicReference(dontCheck super.ghcid);
+
+                  # bump for https://github.com/gregwebs/Shelly.hs/pull/216
+                  # disable tests as they fail when sandboxing is active
+                  shelly = dontCheck (self.callHackage "shelly" "1.12.1" {});
+                })
+
+                # hoogle overrides
+                (self: super: {
+                  # ERROR: Network.Socket.bind: permission denied (Operation not permitted)
+                  http2 = dontCheck super.http2;
+
+                  # https://github.com/sjakobi/bsb-http-chunked/issues/45
+                  bsb-http-chunked = dontCheck super.bsb-http-chunked;
+
+                  # https://github.com/yesodweb/wai/pull/926
+                  # tests hang
+                  warp = dontCheck (self.callHackage "warp" "3.3.25" {});
+
+                  # warp bump requires these bumps
+                  recv = self.callHackage "recv" "0.1.0" {};
+                  warp-tls = self.callHackage "warp-tls" "3.3.5" {};
+                })
+              ];
             });
           };
         };
+      };
     };
-  };
 
   nixpkgs = import nixpkgs-src { inherit config; };
 
-  shell = nixpkgs.haskell.packages.ghc94.shellFor {
+  shell = nixpkgs.haskell.packages.ghc96.shellFor {
     strictDeps = true;
     packages = p: [ p.nightfall ];
     withHoogle = true;
     nativeBuildInputs =
-      let hask = with nixpkgs.haskell.packages.ghc94; [
-        (import ./cabal-multi-repl.nix).cabal-install
+      let hask = with nixpkgs.haskell.packages.ghc96; [
+        (import ./cabal-multi-repl.nix).cabal-install # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12
         ghcid
         (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
       ];
@@ -40,8 +71,7 @@ let
         zlib
       ];
   };
-in
-
-{ inherit nixpkgs shell;
-  inherit (nixpkgs.haskell.packages.ghc94) nightfall;
+in {
+  inherit nixpkgs shell;
+  inherit (nixpkgs.haskell.packages.ghc96) nightfall;
 }
