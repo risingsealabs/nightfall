@@ -9,6 +9,7 @@ module Nightfall.Targets.Miden ( Context(..)
                                ) where
 
 import Nightfall.Lang.Internal.Types as NFTypes
+import Nightfall.Lang.Types
 import Nightfall.MASM.Types as MASM
 import Control.Monad.State
 import Control.Monad.State.Lazy ( modify )
@@ -16,7 +17,7 @@ import Data.Map ( Map )
 import qualified Data.Map as Map
 import Data.Text.Lazy ( Text )
 import qualified Data.Text.Lazy as Text
-import Data.Word (Word64)
+import Data.Word ( Word64 )
 import Data.List ( singleton )
 import Data.Coerce ( coerce )
 
