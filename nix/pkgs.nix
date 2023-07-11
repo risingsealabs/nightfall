@@ -1,9 +1,8 @@
 let
   nixpkgs-src = builtins.fetchTarball {
-    # cherry-pick of https://github.com/NixOS/nixpkgs/pull/224542
-    # on top of merge of https://github.com/NixOS/nixpkgs/pull/237746
-    url = "https://github.com/qrlex/nixpkgs/archive/301a63455028ce683abb2663f36a0fa1464e2e13.tar.gz";
-    sha256 = "sha256:14kxgssgy7pa92wnj2vhsv5jy0qf4kdwnsrsw8272x76531525cw";
+    # merge of https://github.com/NixOS/nixpkgs/pull/237712 into master
+    url = "https://github.com/NixOS/nixpkgs/archive/6eb5c1b5bacbb28804abbb5f4421003b34333685.tar.gz";
+    sha256 = "sha256:1042nf80irf213rv4ifbxs8k2xbqqxq2nnk7nifip5zkrbk9rlq6";
   };
 
   config = {
