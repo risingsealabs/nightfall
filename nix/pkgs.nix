@@ -19,6 +19,37 @@ let
 
                 (self: super: {
                   nightfall = self.callCabal2nix "nightfall" ../. {};
+
+                  # https://github.com/protolude/protolude/pull/143#issuecomment-1589406228
+                  protolude = overrideCabal (self.callHackage "protolude" "0.3.3" {}) (_: {
+                    revision = "1";
+                    editedCabalFile = "sha256-W06ZNxNaF2EdBwmwVsRHC+APa64QBq4r2zQwCwbSDh4=";
+                  });
+
+                  # https://github.com/serokell/galois-field/pull/2
+                  galois-field = doJailbreak (self.callCabal2nix "galois-field" (pkgs.fetchFromGitHub {
+                    owner = "serokell";
+                    repo = "galois-field";
+                    rev = "6fb4511eebbd3363baa9e02cbb51d91642d02740";
+                    sha256 = "sha256-vlBmOT+jzW+txBRUZsj5vfXx5f51iECxZzPvrVs2cUU=";
+                  }) {});
+
+                  # https://github.com/serokell/elliptic-curve/pull/1
+                  elliptic-curve = doJailbreak (self.callCabal2nix "elliptic-curve" (pkgs.fetchFromGitHub {
+                    owner = "serokell";
+                    repo = "elliptic-curve";
+                    rev = "6982573859ca72b53412ea31ba0109a051b1adf2";
+                    sha256 = "sha256-8zZGfdIIuUGsMvTusQA3NMKBpjyMMhkebNGTB3UPTjI=";
+                  }) {});
+
+                  # https://github.com/serokell/pairing/pull/1
+                  pairing = doJailbreak (self.callCabal2nix "pairing" (pkgs.fetchFromGitHub {
+                    owner = "serokell";
+                    repo = "pairing";
+                    rev = "5758deb5567c2ea90a0d4ee6e3f37fcb1e715841";
+                    sha256 = "sha256-W/xyVIid4rcdWa5fCxTqwyKO5YFlC1UgY+MGwHZfOK8=";
+                  }) {});
+
                 })
 
                 # ghcid overrides
