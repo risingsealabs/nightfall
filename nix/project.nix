@@ -6,7 +6,7 @@ let
       haskell = pkgs.haskell // {
         packages = defaults.packageSets.haskell pkgs
           (self: super: {
-            nightfall = self.callCabal2nix "nightfall" ../. {};
+            nightfall = self.callCabal2nix "nightfall" (pkgs.nix-gitignore.gitignoreSource [] ../.) {};
           })
         ;
       };
