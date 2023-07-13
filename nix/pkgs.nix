@@ -5,7 +5,6 @@ let
     sha256 = "sha256:1042nf80irf213rv4ifbxs8k2xbqqxq2nnk7nifip5zkrbk9rlq6";
   };
 
-
   overrides = pkgs: with pkgs.haskell.lib;
     let
       # https://github.com/NixOS/nixpkgs/issues/140774#issuecomment-1371565125
@@ -79,6 +78,7 @@ let
               (self: super: { nightfall = self.callCabal2nix "nightfall" ../. {}; })
               (overrides pkgs).ghcid
               (overrides pkgs).hoogle
+              (overrides pkgs).pairing
             ];
           });
         };
