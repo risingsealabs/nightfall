@@ -103,6 +103,6 @@ let
       ];
   };
 in {
-  inherit nixpkgs shell overrides;
+  inherit nixpkgs nixpkgs-src shell overrides;
   inherit (nixpkgs.haskell.packages.ghc96) nightfall;
 }
