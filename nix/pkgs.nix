@@ -69,24 +69,34 @@ let
       };
     };
 
-  haskellPackagesOverrides = pkgs: ghc: projectPackages: {
-    "${ghc}" = pkgs.haskell.packages."${ghc}".override(old: {
-      overrides = pkgs.lib.fold pkgs.lib.composeExtensions (old.overrides or (_: _: {})) [
+  haskellPackagesOverrides = nixpkgs: ghc: projectPackages: {
+    "${ghc}" = nixpkgs.haskell.packages."${ghc}".override(old: {
+      overrides = nixpkgs.lib.fold nixpkgs.lib.composeExtensions (old.overrides or (_: _: {})) [
         projectPackages
-        (overrides pkgs).ghcid
-        (overrides pkgs).hoogle
-        (overrides pkgs).pairing
+        (overrides nixpkgs).ghcid
+        (overrides nixpkgs).hoogle
+        (overrides nixpkgs).pairing
       ];
     });
   };
 
   defaults = {
     haskell = {
-      packages = pkgs: projectPackages: with pkgs.haskell.lib;
-        pkgs.haskell.packages
-        // haskellPackagesOverrides pkgs "ghc94" projectPackages
-        // haskellPackagesOverrides pkgs "ghc96" projectPackages
-        ;
+      packages = nixpkgs: projectPackages: with nixpkgs.haskell.lib;
+        nixpkgs.haskell.packages
+        // haskellPackagesOverrides nixpkgs "ghc94" projectPackages
+        // haskellPackagesOverrides nixpkgs "ghc96" projectPackages;
+
+      shell = nixpkgs: ghc: projectPkgs: tools: with nixpkgs.haskell.packages."${ghc}"; shellFor {
+        strictDeps = true;
+        packages = projectPkgs;
+        withHoogle = true;
+        nativeBuildInputs = tools ++ [
+          (import ./cabal-multi-repl.nix).cabal-install # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12
+          ghcid
+          (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
+        ];
+      };
     };
   };
 
