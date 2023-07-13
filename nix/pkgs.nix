@@ -81,13 +81,14 @@ let
   };
 
   defaults = {
-    haskell = {
-      packages = nixpkgs: projectPackages: with nixpkgs.haskell.lib;
+    packageSets = {
+      haskell = nixpkgs: projectPackages: with nixpkgs.haskell.lib;
         nixpkgs.haskell.packages
         // haskellPackagesOverrides nixpkgs "ghc94" projectPackages
         // haskellPackagesOverrides nixpkgs "ghc96" projectPackages;
-
-      shell = nixpkgs: ghc: projectPkgs: tools: with nixpkgs.haskell.packages."${ghc}"; shellFor {
+    };
+    shells = {
+      haskell = nixpkgs: ghc: projectPkgs: tools: with nixpkgs.haskell.packages."${ghc}"; shellFor {
         strictDeps = true;
         packages = projectPkgs;
         withHoogle = true;

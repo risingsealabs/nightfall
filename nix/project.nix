@@ -4,7 +4,7 @@ let
   config = {
     packageOverrides = pkgs: with pkgs.haskell.lib; {
       haskell = pkgs.haskell // {
-        packages = defaults.haskell.packages pkgs
+        packages = defaults.packageSets.haskell pkgs
           (self: super: {
             nightfall = self.callCabal2nix "nightfall" ../. {};
           })
@@ -15,7 +15,7 @@ let
 
   nixpkgs = import nixpkgs-src { inherit config; };
 
-  shell = defaults.haskell.shell nixpkgs "ghc96" (p: [p.nightfall]) (with nixpkgs; [
+  shell = defaults.shells.haskell nixpkgs "ghc96" (p: [p.nightfall]) (with nixpkgs; [
     zlib
   ]);
 
