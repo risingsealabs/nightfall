@@ -1,11 +1,11 @@
 let
-  nixpkgs-src = builtins.fetchTarball {
+  nixpkgsSrc = builtins.fetchTarball {
     # merge of https://github.com/NixOS/nixpkgs/pull/237712 into master
     url = "https://github.com/NixOS/nixpkgs/archive/6eb5c1b5bacbb28804abbb5f4421003b34333685.tar.gz";
     sha256 = "sha256:1042nf80irf213rv4ifbxs8k2xbqqxq2nnk7nifip5zkrbk9rlq6";
   };
 
-  overrides = pkgs: with pkgs.haskell.lib;
+  overrideGroups = pkgs: with pkgs.haskell.lib;
     let
       # https://github.com/NixOS/nixpkgs/issues/140774#issuecomment-1371565125
       # https://github.com/NixOS/nixpkgs/issues/220647
@@ -69,75 +69,73 @@ let
       };
     };
 
-  defaultOverrides = nixpkgs: with nixpkgs.lib; fold composeExtensions (_: _: {}) [
-    (overrides nixpkgs).ghcid
-    (overrides nixpkgs).hoogle
-    (overrides nixpkgs).pairing
+  overrides = nixpkgs: with nixpkgs.lib; fold composeExtensions (_: _: {}) [
+    (overrideGroups nixpkgs).ghcid
+    (overrideGroups nixpkgs).hoogle
+    (overrideGroups nixpkgs).pairing
   ];
 
-  defaults = rec {
-    shells = {
-      haskell = nixpkgs: compiler: projectPkgs: tools: with nixpkgs.haskell.packages.${compiler}; shellFor {
-        strictDeps = true;
-        packages = projectPkgs;
-        withHoogle = true;
-        nativeBuildInputs = tools ++ [
-          (import ./cabal-multi-repl.nix).cabal-install # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12
-          ghcid
-          (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
-        ];
-      };
+  shells = {
+    haskell = nixpkgs: compiler: projectPkgs: tools: with nixpkgs.haskell.packages.${compiler}; shellFor {
+      strictDeps = true;
+      packages = projectPkgs;
+      withHoogle = true;
+      nativeBuildInputs = tools ++ [
+        (import ./cabal-multi-repl.nix).cabal-install # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12
+        ghcid
+        (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
+      ];
     };
+  };
 
-    project = {
-      haskell = mkProject:
-        let
-          args = mkProject { inherit nixpkgs; };
+  projects = {
+    haskell = mkProject:
+      let
+        args = mkProject { inherit nixpkgs; };
 
-          nixpkgsSrc = args.nixpkgsSrc or nixpkgs-src;
-          compiler = args.compiler or "ghc96";
-          shellTools = args.shellTools or [];
-          haskellOverrides = args.haskellOverrides;
-          projectPackages = args.projectPackages or {};
-          combineOverrides = args.combineOverrides or (overrides: with nixpkgs.lib; fold composeExtensions (_: _: {}) [
-            overrides.default
-            overrides.package
-            overrides.project
-          ]);
+        nixpkgs = import (args.nixpkgsSrc or nixpkgsSrc) { inherit config; };
 
-          nixpkgs = import nixpkgs-src { inherit config; };
+        compiler = args.compiler or "ghc96";
+        shellTools = args.shellTools or [];
+        haskellOverrides = args.haskellOverrides or (_: _: {});
+        projectPackages = args.projectPackages or {};
 
-          config = {
-            packageOverrides = nixpkgs: {
-              haskell = nixpkgs.haskell // {
-                packages = nixpkgs.haskell.packages // {
-                  "${compiler}" = nixpkgs.haskell.packages.${compiler}.override(old: {
-                    overrides = combineOverrides {
-                      default = nixpkgs.lib.composeExtensions old.overrides (defaultOverrides nixpkgs);
+        combineOverrides = args.combineOverrides or (overrides: with nixpkgs.lib; fold composeExtensions (_: _: {}) [
+          overrides.default
+          overrides.package
+          overrides.project
+        ]);
 
-                      package = self: super: builtins.mapAttrs
-                        (n: v: self.callCabal2nix n (nixpkgs.nix-gitignore.gitignoreSource [] v) {})
-                        projectPackages;
+        config = {
+          packageOverrides = nixpkgs: {
+            haskell = nixpkgs.haskell // {
+              packages = nixpkgs.haskell.packages // {
+                "${compiler}" = nixpkgs.haskell.packages.${compiler}.override(old: {
+                  overrides = combineOverrides {
+                    default = nixpkgs.lib.composeExtensions old.overrides (overrides nixpkgs);
 
-                      project = haskellOverrides;
-                    };
-                  });
-                };
+                    package = self: super: builtins.mapAttrs
+                      (n: v: self.callCabal2nix n (nixpkgs.nix-gitignore.gitignoreSource [] v) {})
+                      projectPackages;
+
+                    project = haskellOverrides;
+                  };
+                });
               };
             };
           };
-
-          haskellPackages = nixpkgs.haskell.packages.${compiler};
-
-          shellPackages = p: nixpkgs.lib.mapAttrsToList (n: _: p.${n}) projectPackages;
-
-          shell = defaults.shells.haskell nixpkgs compiler shellPackages shellTools;
-
-        in {
-          inherit nixpkgs haskellPackages shell;
         };
+
+        haskellPackages = nixpkgs.haskell.packages.${compiler};
+
+        shellPackages = p: nixpkgs.lib.mapAttrsToList (n: _: p.${n}) projectPackages;
+
+        shell = shells.haskell nixpkgs compiler shellPackages shellTools;
+
+      in {
+        inherit nixpkgs haskellPackages shell;
+      };
     };
-  };
 in {
-  inherit nixpkgs-src overrides defaults;
+  inherit nixpkgsSrc overrides overrideGroups shells projects;
 }

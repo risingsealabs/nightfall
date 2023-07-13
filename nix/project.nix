@@ -1,4 +1,4 @@
-(import ./pkgs.nix).defaults.project.haskell ({nixpkgs, ...}: {
+(import ./defaults.nix).projects.haskell ({nixpkgs, ...}: {
   compiler = "ghc96";
 
   haskellOverrides = self: super: {};
