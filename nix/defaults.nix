@@ -126,14 +126,12 @@ let
           };
         };
 
-        haskellPackages = nixpkgs.haskell.packages.${compiler};
-
         shellPackages = p: nixpkgs.lib.mapAttrsToList (n: _: p.${n}) projectPackages;
 
-        shell = shells.haskell nixpkgs compiler shellPackages shellTools;
-
       in {
-        inherit nixpkgs haskellPackages shell;
+        inherit nixpkgs;
+        haskellPackages = nixpkgs.haskell.packages.${compiler};
+        shell = shells.haskell nixpkgs compiler shellPackages shellTools;
       };
     };
 in {
