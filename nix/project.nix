@@ -1,19 +1,14 @@
 let
-  inherit (import ./pkgs.nix) overrides nixpkgs-src;
+  inherit (import ./pkgs.nix) defaults nixpkgs-src overrides;
 
   config = {
     packageOverrides = pkgs: with pkgs.haskell.lib; {
       haskell = pkgs.haskell // {
-        packages = pkgs.haskell.packages // {
-          ghc96 = pkgs.haskell.packages.ghc96.override(old: {
-            overrides = pkgs.lib.fold pkgs.lib.composeExtensions (old.overrides or (_: _: {})) [
-              (self: super: { nightfall = self.callCabal2nix "nightfall" ../. {}; })
-              (overrides pkgs).ghcid
-              (overrides pkgs).hoogle
-              (overrides pkgs).pairing
-            ];
-          });
-        };
+        packages = defaults.haskell.packages pkgs
+          (self: super: {
+            nightfall = self.callCabal2nix "nightfall" ../. {};
+          })
+        ;
       };
     };
   };

@@ -69,6 +69,27 @@ let
       };
     };
 
+  haskellPackagesOverrides = pkgs: ghc: projectPackages: {
+    "${ghc}" = pkgs.haskell.packages."${ghc}".override(old: {
+      overrides = pkgs.lib.fold pkgs.lib.composeExtensions (old.overrides or (_: _: {})) [
+        projectPackages
+        (overrides pkgs).ghcid
+        (overrides pkgs).hoogle
+        (overrides pkgs).pairing
+      ];
+    });
+  };
+
+  defaults = {
+    haskell = {
+      packages = pkgs: projectPackages: with pkgs.haskell.lib;
+        pkgs.haskell.packages
+        // haskellPackagesOverrides pkgs "ghc94" projectPackages
+        // haskellPackagesOverrides pkgs "ghc96" projectPackages
+        ;
+    };
+  };
+
 in {
-  inherit nixpkgs-src overrides;
+  inherit nixpkgs-src overrides defaults;
 }
