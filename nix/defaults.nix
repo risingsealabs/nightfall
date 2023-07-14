@@ -84,9 +84,12 @@ let
         ghcid
         (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
       ] ++ [
-        (if builtins.compareVersions compiler "ghc96" >= 0
-          then (import ./cabal-multi-repl.nix).cabal-install # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12)
-          else cabal-install)
+        # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12)
+        # ghci bug in 9.4 prevents proper use, so enable only for 9.6
+        (with nixpkgs.lib.strings; if versionAtLeast compiler "ghc96" && versionOlder compiler "ghc98"
+          then (import ./cabal-multi-repl.nix).cabal-install
+          else cabal-install
+        )
       ];
     };
   };
