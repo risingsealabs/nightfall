@@ -21,17 +21,6 @@ let
 
     in {
       cabal = self: super: {
-        ghc = super.ghc.overrideAttrs(finalAttrs: previousAttrs: {
-          prePatch = ''
-            pushd Libraries
-            rm -rf Cabal
-            cp -r ${cabalSrc} Cabal
-            rm -rf Cabal/.git
-            chmod -R +w *
-            popd
-          '' + (previousAttrs.prePatch or "");
-        });
-
         Cabal = self.callCabal2nix "Cabal" (cabalSrc + "/Cabal") {};
         Cabal-syntax = self.callCabal2nix "Cabal-syntax" (cabalSrc + "/Cabal-syntax") {};
         cabal-install-solver = self.callCabal2nix "cabal-install-solver" (cabalSrc + "/cabal-install-solver") {};
