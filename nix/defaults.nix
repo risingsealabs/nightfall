@@ -1,6 +1,6 @@
 let
+  # merge into master of https://github.com/NixOS/nixpkgs/pull/237712
   nixpkgsSrc = builtins.fetchTarball {
-    # merge of https://github.com/NixOS/nixpkgs/pull/237712 into master
     url = "https://github.com/NixOS/nixpkgs/archive/6eb5c1b5bacbb28804abbb5f4421003b34333685.tar.gz";
     sha256 = "sha256:1042nf80irf213rv4ifbxs8k2xbqqxq2nnk7nifip5zkrbk9rlq6";
   };
@@ -10,7 +10,43 @@ let
       # https://github.com/NixOS/nixpkgs/issues/140774#issuecomment-1371565125
       # https://github.com/NixOS/nixpkgs/issues/220647
       fixCyclicReference = drv: overrideCabal drv (_: { enableSeparateBinOutput = false; });
+
+      # merge into master of https://github.com/haskell/cabal/pull/8726
+      cabalSrc = pkgs.fetchFromGitHub {
+        owner = "haskell";
+        repo = "cabal";
+        rev = "94615d6ac6ef585329eab192ed70486e722eeca1";
+        sha256 = "sha256-2nSTlPMHEXtv3XsDVBCR8EdeYmSQYztQno+NQIJbf1c=";
+      };
+
     in {
+      cabal = self: super: {
+        ghc = super.ghc.overrideAttrs(finalAttrs: previousAttrs: {
+          prePatch = ''
+            pushd Libraries
+            rm -rf Cabal
+            cp -r ${cabalSrc} Cabal
+            rm -rf Cabal/.git
+            chmod -R +w *
+            popd
+          '' + (previousAttrs.prePatch or "");
+        });
+
+        Cabal = self.callCabal2nix "Cabal" (cabalSrc + "/Cabal") {};
+        Cabal-syntax = self.callCabal2nix "Cabal-syntax" (cabalSrc + "/Cabal-syntax") {};
+        cabal-install-solver = self.callCabal2nix "cabal-install-solver" (cabalSrc + "/cabal-install-solver") {};
+        cabal-install = self.callCabal2nix "cabal-install" (cabalSrc + "/cabal-install") {
+          # Taken from the generated file nixpkgs/pkgs/development/haskell-modules/hackage-packages.nix
+          Cabal-described = null;
+          Cabal-QuickCheck = null;
+          Cabal-tree-diff = null;
+        };
+
+        # newer ghc and/or cabal changes the value of `srcLocPackage` in
+        # https://github.com/sol/call-stack/blob/1d78c6320f986a2948b2076736b1678e53f862cf/test/Data/CallStackSpec.hs#L16
+        call-stack = dontCheck super.call-stack;
+      };
+
       ghcid = self: super: {
         # some tests are non-reproducible from measuring time
         ghcid = fixCyclicReference (dontCheck super.ghcid);
@@ -75,22 +111,45 @@ let
     (overrideGroups nixpkgs).pairing
   ];
 
+  configHaskellOverrides = compiler: mkOverrides: {
+    packageOverrides = nixpkgs: {
+      haskell = nixpkgs.haskell // {
+        packages = nixpkgs.haskell.packages // {
+          "${compiler}" = nixpkgs.haskell.packages.${compiler}.override(old: {
+            overrides = mkOverrides old;
+          });
+        };
+      };
+    };
+  };
+
   shells = {
     haskell = nixpkgs: compiler: projectPkgs: tools: with nixpkgs.haskell.packages.${compiler}; shellFor {
       strictDeps = true;
       packages = projectPkgs;
       withHoogle = true;
-      nativeBuildInputs = tools ++ [
-        ghcid
-        (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: { propagatedBuildInputs = []; buildInputs = previousAttrs.propagatedBuildInputs; }))
-      ] ++ [
-        # Shouldn't be needed once this cabal is bundled with the compiler, likely ghc 9.8 / Cabal 3.12)
-        # ghci bug in 9.4 prevents proper use, so enable only for 9.6
-        (with nixpkgs.lib.strings; if versionAtLeast compiler "ghc96" && versionOlder compiler "ghc98"
-          then (import ./cabal-multi-repl.nix).cabal-install
-          else cabal-install
-        )
-      ];
+      nativeBuildInputs =
+      let
+        nixpkgs-with-cabal-override = import nixpkgsSrc {
+          config = configHaskellOverrides compiler (old: (overrideGroups nixpkgs).cabal);
+        };
+      in
+        tools ++ [
+          ghcid
+
+          (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: {
+            propagatedBuildInputs = [];
+            buildInputs = previousAttrs.propagatedBuildInputs;
+          }))
+
+          # Shouldn't be needed once multi-repl cabal is bundled with the compiler, (likely ghc 9.8 / Cabal 3.12)
+          # ghci bug in 9.4 prevents proper use, so enable only for 9.6
+          (with nixpkgs.lib.strings;
+            if versionAtLeast compiler "ghc96" && versionOlder compiler "ghc98"
+            then nixpkgs-with-cabal-override.haskell.packages.${compiler}.cabal-install
+            else cabal-install
+          )
+        ];
     };
   };
 
@@ -98,8 +157,8 @@ let
     haskell = mkProject:
       let
         args = mkProject { inherit nixpkgs; };
-
-        nixpkgs = import (args.nixpkgsSrc or nixpkgsSrc) { inherit config; };
+        nixpkgs = mkNixpkgs { inherit config; };
+        mkNixpkgs = import (args.nixpkgsSrc or nixpkgsSrc);
 
         compiler = args.compiler or "ghc96";
         shellTools = args.shellTools or [];
@@ -112,25 +171,14 @@ let
           overrides.project
         ]);
 
-        config = {
-          packageOverrides = nixpkgs: {
-            haskell = nixpkgs.haskell // {
-              packages = nixpkgs.haskell.packages // {
-                "${compiler}" = nixpkgs.haskell.packages.${compiler}.override(old: {
-                  overrides = combineOverrides {
-                    default = nixpkgs.lib.composeExtensions old.overrides (overrides nixpkgs);
+        config = configHaskellOverrides compiler (old: combineOverrides {
+          default = nixpkgs.lib.composeExtensions old.overrides (overrides nixpkgs);
+          package = self: super: builtins.mapAttrs
+            (n: v: self.callCabal2nix n (nixpkgs.nix-gitignore.gitignoreSource [] v) {})
+            projectPackages;
 
-                    package = self: super: builtins.mapAttrs
-                      (n: v: self.callCabal2nix n (nixpkgs.nix-gitignore.gitignoreSource [] v) {})
-                      projectPackages;
-
-                    project = haskellOverrides;
-                  };
-                });
-              };
-            };
-          };
-        };
+          project = haskellOverrides;
+        });
 
         shellPackages = p: nixpkgs.lib.mapAttrsToList (n: _: p.${n}) projectPackages;
 
