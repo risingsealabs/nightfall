@@ -56,6 +56,14 @@ let
         shelly = dontCheck (self.callHackage "shelly" "1.12.1" {});
       };
 
+      hlint = self: super: {
+        hlint = self.callHackageDirect {
+          pkg = "hlint";
+          ver = "3.6";
+          sha256 = "sha256-qoCzV8kTxY6zZ0hjqUa4CiLhxezxHrrSOH9u+vLSvh8=";
+        } {};
+      };
+
       hoogle = self: super: {
         # ERROR: Network.Socket.bind: permission denied (Operation not permitted)
         http2 = dontCheck super.http2;
@@ -105,10 +113,12 @@ let
       };
     };
 
-  overrides = nixpkgs: with nixpkgs.lib; fold composeExtensions (_: _: {}) [
-    (overrideGroups nixpkgs).ghcid
-    (overrideGroups nixpkgs).hoogle
-    (overrideGroups nixpkgs).pairing
+  overrides = nixpkgs: with nixpkgs.lib; with (overrideGroups nixpkgs);
+    fold composeExtensions (_: _: {}) [
+      ghcid
+      hlint
+      hoogle
+      pairing
   ];
 
   configHaskellOverrides = compiler: mkOverrides: {
@@ -136,6 +146,8 @@ let
       in
         tools ++ [
           ghcid
+
+          hlint
 
           (haskell-language-server.overrideAttrs(finalAttrs: previousAttrs: {
             propagatedBuildInputs = [];
