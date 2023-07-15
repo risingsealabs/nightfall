@@ -113,13 +113,15 @@ let
       };
     };
 
-  overrides = nixpkgs: with nixpkgs.lib; with (overrideGroups nixpkgs);
-    fold composeExtensions (_: _: {}) [
-      ghcid
-      hlint
-      hoogle
-      pairing
-  ];
+  overrides = nixpkgs: compiler: with nixpkgs.lib;
+    let
+      exts = with (overrideGroups nixpkgs); [
+        ghcid
+        hoogle
+        pairing
+      ] ++ lists.optional (versionAtLeast compiler "ghc96") hlint;
+    in
+      fold composeExtensions (_: _: {}) exts;
 
   configHaskellOverrides = compiler: mkOverrides: {
     packageOverrides = nixpkgs: {
@@ -184,7 +186,7 @@ let
         ]);
 
         config = configHaskellOverrides compiler (old: combineOverrides {
-          default = nixpkgs.lib.composeExtensions old.overrides (overrides nixpkgs);
+          default = nixpkgs.lib.composeExtensions old.overrides (overrides nixpkgs compiler);
           package = self: super: builtins.mapAttrs
             (n: v: self.callCabal2nix n (nixpkgs.nix-gitignore.gitignoreSource [] v) {})
             projectPackages;
