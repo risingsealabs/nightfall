@@ -11,6 +11,7 @@ module Nightfall.Targets.Miden ( Context(..)
 import Nightfall.Lang.Internal.Types as NFTypes
 import Nightfall.Lang.Types
 import Nightfall.MASM.Types as MASM
+import Control.Monad ( when, unless )
 import Control.Monad.State
 import Control.Monad.State.Lazy ( modify )
 import Data.Map ( Map )

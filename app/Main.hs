@@ -10,6 +10,7 @@ import Examples.Fun
 import Examples.Inputs
 import Data.Map as Map
 import System.Environment (getArgs, getProgName)
+import Control.Monad ( when )
 
 main :: IO ()
 main = do
