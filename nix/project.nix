@@ -1,12 +1,12 @@
 let
   miden = nixpkgs: nixpkgs.rustPlatform.buildRustPackage rec {
     pname = "miden";
-    version = "0.5.0";
+    version = "0.6.1";
     src = nixpkgs.fetchFromGitHub {
       owner = "0xPolygonMiden";
       repo = "miden-vm";
       rev = "v${version}";
-      sha256 = "sha256-bDILZ8vvxjB/JN6tyhTNKxjQB/35M47grxFqToesH9E=";
+      sha256 = "sha256-8DPZNcmE1yMTDsxuaZFTOLfjwRlsWZPFDtfVRLMSL7U=";
     };
     cargoLock.lockFile = ./miden_cargo.lock;
     postPatch = ''
