@@ -106,45 +106,45 @@ bool = Expr . Bo
 -- ** Arithmetic operations
 
 add :: Num a => Expr a -> Expr a -> Expr a
-add  (Expr e1) (Expr e2) = Expr $ Add e1 e2
+add  (Expr e1) (Expr e2) = Expr $ BinOp Add e1 e2
 
 sub :: Num a => Expr a -> Expr a -> Expr a
-sub (Expr e1) (Expr e2)= Expr $ Sub e1 e2
+sub (Expr e1) (Expr e2)= Expr $ BinOp Sub e1 e2
 
 mul :: Num a => Expr a -> Expr a -> Expr a
-mul (Expr e1) (Expr e2) = Expr $ Mul e1 e2
+mul (Expr e1) (Expr e2) = Expr $ BinOp Mul e1 e2
 
 div' :: Num a => Expr a -> Expr a -> Expr a
-div' (Expr e1) (Expr e2) = Expr $ Div e1 e2
+div' (Expr e1) (Expr e2) = Expr $ BinOp Div e1 e2
 
 mod' :: Num a => Expr a -> Expr a -> Expr a
-mod' (Expr e1) (Expr e2) = Expr $ Mod e1 e2
+mod' (Expr e1) (Expr e2) = Expr $ BinOp Mod e1 e2
 
 idiv32 :: Integral a => Expr a -> Expr a -> Expr a
-idiv32 (Expr e1) (Expr e2) = Expr $ IDiv32 e1 e2
+idiv32 (Expr e1) (Expr e2) = Expr $ BinOp IDiv32 e1 e2
 
 -- ** Boolean operations
 
 eq :: Eq a => Expr a -> Expr a -> Expr Bool
-eq (Expr e1) (Expr e2)= Expr $ Equal e1 e2
+eq (Expr e1) (Expr e2)= Expr $ BinOp Equal e1 e2
 
 not' :: Expr Bool -> Expr Bool
-not' (Expr e) = Expr $ Not e
+not' (Expr e) = Expr $ UnOp Not e
 
 lt :: Ord a => Expr a -> Expr a -> Expr Bool
-lt (Expr e1) (Expr e2)= Expr $ Lower e1 e2
+lt (Expr e1) (Expr e2)= Expr $ BinOp Lower e1 e2
 
 lte :: Ord a => Expr a -> Expr a -> Expr Bool
-lte (Expr e1) (Expr e2) = Expr $ LowerEq e1 e2
+lte (Expr e1) (Expr e2) = Expr $ BinOp LowerEq e1 e2
 
 gt :: Ord a => Expr a -> Expr a -> Expr Bool
-gt (Expr e1) (Expr e2) = Expr $ Greater e1 e2
+gt (Expr e1) (Expr e2) = Expr $ BinOp Greater e1 e2
 
 gte :: Ord a => Expr a -> Expr a -> Expr Bool
-gte(Expr e1) (Expr e2) = Expr $ GreaterEq e1 e2
+gte(Expr e1) (Expr e2) = Expr $ BinOp GreaterEq e1 e2
 
 isOdd :: Num a => Expr a -> Expr Bool
-isOdd (Expr e) = Expr $ IsOdd e
+isOdd (Expr e) = Expr $ UnOp IsOdd e
 
 -- ** Variables (typed)
 varF :: VarName -> Expr Felt

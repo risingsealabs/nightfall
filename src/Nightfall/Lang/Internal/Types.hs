@@ -9,29 +9,39 @@ type VarName = String
 
 type FunName = String
 
+-- | Unary operations.
+data UnOp =
+      Not    -- ^ !a
+    | IsOdd  -- a `mod` 2 == 1
+    deriving (Eq, Show)
+
+-- | Binary operations.
+data BinOp =
+    -- Arithmetic operations
+      Add     -- ^ a + b
+    | Sub     -- ^ a - b
+    | Mul     -- ^ a * b
+    | Div     -- ^ a / b (integer division)
+    | Mod     -- ^ a % b
+    | IDiv32  -- ^ a `quot` b with a and b 32-bit integers
+
+    -- Boolean operations
+    | Equal      -- ^ a == b
+    | Lower      -- ^ a < b
+    | LowerEq    -- ^ a <= b
+    | Greater    -- ^ a > b
+    | GreaterEq  -- ^ a >= b
+    deriving (Eq, Show)
+
 -- | Expression, internal type, not exposed
 data Expr_ =
     -- | Literals
       Lit Felt  -- ^ 309183, 2398713, whatever NOTE: we might want to use explicit types like W32, W64, etc.?
-    | Bo Bool   -- ^ true/false, 1/0 
+    | Bo Bool   -- ^ true/false, 1/0
 
-    -- | Arithmetic operations
-    | Add Expr_ Expr_ -- ^ a + b
-    | Sub Expr_ Expr_ -- ^ a - b
-    | Mul Expr_ Expr_ -- ^ a * b
-    | Div Expr_ Expr_ -- ^ a / b (integer division)
-    | Mod Expr_ Expr_ -- ^ a % b
-    | IDiv32 Expr_ Expr_ -- ^ a `quot` b with a and b 32-bit integers
+    | UnOp UnOp Expr_
+    | BinOp BinOp Expr_ Expr_
 
-    -- | Boolean operations
-    | Equal Expr_ Expr_     -- ^ a == b
-    | Not Expr_             -- ^ !a
-    | Lower Expr_ Expr_     -- ^ a < b
-    | LowerEq Expr_ Expr_   -- ^ a <= b
-    | Greater Expr_ Expr_   -- ^ a > b
-    | GreaterEq Expr_ Expr_ -- ^ a >= b
-    | IsOdd Expr_           -- a `mod` 2 == 1
-    
     -- | Variables
     | VarF VarName     -- ^ "calling" a variable of type Felt by its name (e.g. "foo")
     | VarB VarName     -- ^ same, but with boolean variable

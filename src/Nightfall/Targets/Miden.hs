@@ -13,10 +13,8 @@ import Nightfall.Lang.Types
 import Nightfall.MASM.Types as MASM
 import Control.Monad ( when, unless )
 import Control.Monad.State
-import Control.Monad.State.Lazy ( modify )
 import Data.Map ( Map )
 import qualified Data.Map as Map
-import Data.Text.Lazy ( Text )
 import qualified Data.Text.Lazy as Text
 import Data.Word ( Word64 )
 import Data.List ( singleton )
@@ -137,8 +135,25 @@ transpileStatement (Return mE) = case mE of
 
 transpileStatement EmptyLine = return . singleton $ MASM.EmptyL
 
-transpileStatement _ = error "transpileStatement::TODO"
+-- | Transpile an unary operation.
+transpileUnOp :: UnOp -> [Instruction]
+transpileUnOp NFTypes.Not   = [ MASM.Not   ]
+transpileUnOp NFTypes.IsOdd = [ MASM.IsOdd ]
 
+-- | Transpile a binary operation.
+transpileBinOp :: BinOp -> [Instruction]
+-- Arithmetics operations are matched to their corresponding Miden operations
+transpileBinOp NFTypes.Add    = [ MASM.Add Nothing ]
+transpileBinOp NFTypes.Sub    = [ MASM.Sub Nothing ]
+transpileBinOp NFTypes.Mul    = [ MASM.Mul Nothing ]
+transpileBinOp NFTypes.Div    = [ MASM.Div Nothing ]
+transpileBinOp NFTypes.Mod    = error "No support for simple 'mod' function in Miden"
+transpileBinOp NFTypes.IDiv32 = [ MASM.IDiv ]
+transpileBinOp Equal          = [ MASM.Eq Nothing ]
+transpileBinOp Lower          = [ MASM.Lt ]
+transpileBinOp LowerEq        = [ MASM.Lte ]
+transpileBinOp Greater        = [ MASM.Gt ]
+transpileBinOp GreaterEq      = [ MASM.Gte ]
 
 -- TODO: range check, etc.
 transpileExpr :: Expr_ -> State Context [Instruction]
@@ -150,8 +165,7 @@ transpileExpr (Lit felt) = do
 transpileExpr (Bo bo) = do
     let felt = if bo then 1 else 0
     return . singleton . Push $ felt
-
--- | Using a variable means we fetch the value from (global) memory and push it to the stack
+-- Using a variable means we fetch the value from (global) memory and push it to the stack
 transpileExpr (VarF varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack
     vars <- gets variables
@@ -170,59 +184,13 @@ transpileExpr (VarB varname) = do
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar = [MASM.Comment $ "var " <> Text.pack varname <> " (bool)" | shouldTrace]
             return $ traceVar <> [MemLoad . Just . fromIntegral $ idx]
-
--- | Arithmetics operations are matched to their corresponding Miden operations
-transpileExpr (NFTypes.Add e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Add Nothing ]
-transpileExpr (NFTypes.Sub e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Sub Nothing ]
-transpileExpr (NFTypes.Mul e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Mul Nothing ]
-transpileExpr (NFTypes.Div e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Div Nothing ]
-transpileExpr (NFTypes.Mod _ _) = do
-    error "No support for simple 'mod' function in Miden"
-    -- e1s <- transpileExpr e1
-    -- e2s <- transpileExpr e2
-    -- return $ e1s <> e2s <> [ MASM.Mod? Nothing ]
-transpileExpr (NFTypes.IDiv32 e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.IDiv ]
-transpileExpr (Equal e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Eq Nothing ]
-transpileExpr (Lower e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Lt ]
-transpileExpr (LowerEq e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Lte ]
-transpileExpr (Greater e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Gt ]
-transpileExpr (GreaterEq e1 e2) = do
-    e1s <- transpileExpr e1
-    e2s <- transpileExpr e2
-    return $ e1s <> e2s <> [ MASM.Gte ]
-transpileExpr (NFTypes.Not e) = do
+transpileExpr (UnOp op e) = do
     es <- transpileExpr e
-    return $ es <> [ MASM.Not ]
-transpileExpr (NFTypes.IsOdd e) = do
-    es <- transpileExpr e
-    return $ es <> [ MASM.IsOdd ]
+    return $ es <> transpileUnOp op
+transpileExpr (BinOp op e1 e2) = do
+    e1s <- transpileExpr e1
+    e2s <- transpileExpr e2
+    return $ e1s <> e2s <> transpileBinOp op
 transpileExpr NextSecret = return . singleton . MASM.AdvPush $ 1
 
-transpileExpr _ = error "transpileExpr::TODO"
+transpileExpr FCall{} = error "transpileExpr::TODO"
