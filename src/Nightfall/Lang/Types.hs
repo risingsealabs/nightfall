@@ -12,7 +12,6 @@ module Nightfall.Lang.Types ( Felt
                             , sub
                             , mul
                             , div'
-                            , mod'
                             , idiv32
                             , eq
                             , not'
@@ -117,9 +116,6 @@ mul (Expr e1) (Expr e2) = Expr $ BinOp Mul e1 e2
 div' :: Num a => Expr a -> Expr a -> Expr a
 div' (Expr e1) (Expr e2) = Expr $ BinOp Div e1 e2
 
-mod' :: Num a => Expr a -> Expr a -> Expr a
-mod' (Expr e1) (Expr e2) = Expr $ BinOp Mod e1 e2
-
 idiv32 :: Integral a => Expr a -> Expr a -> Expr a
 idiv32 (Expr e1) (Expr e2) = Expr $ BinOp IDiv32 e1 e2
 
@@ -141,7 +137,7 @@ gt :: Ord a => Expr a -> Expr a -> Expr Bool
 gt (Expr e1) (Expr e2) = Expr $ BinOp Greater e1 e2
 
 gte :: Ord a => Expr a -> Expr a -> Expr Bool
-gte(Expr e1) (Expr e2) = Expr $ BinOp GreaterEq e1 e2
+gte (Expr e1) (Expr e2) = Expr $ BinOp GreaterEq e1 e2
 
 isOdd :: Num a => Expr a -> Expr Bool
 isOdd (Expr e) = Expr $ UnOp IsOdd e

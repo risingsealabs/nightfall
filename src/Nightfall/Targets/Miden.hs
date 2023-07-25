@@ -147,7 +147,6 @@ transpileBinOp NFTypes.Add    = [ MASM.Add Nothing ]
 transpileBinOp NFTypes.Sub    = [ MASM.Sub Nothing ]
 transpileBinOp NFTypes.Mul    = [ MASM.Mul Nothing ]
 transpileBinOp NFTypes.Div    = [ MASM.Div Nothing ]
-transpileBinOp NFTypes.Mod    = error "No support for simple 'mod' function in Miden"
 transpileBinOp NFTypes.IDiv32 = [ MASM.IDiv ]
 transpileBinOp Equal          = [ MASM.Eq Nothing ]
 transpileBinOp Lower          = [ MASM.Lt ]

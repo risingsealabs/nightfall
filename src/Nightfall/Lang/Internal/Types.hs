@@ -22,7 +22,6 @@ data BinOp =
     | Sub     -- ^ a - b
     | Mul     -- ^ a * b
     | Div     -- ^ a / b (integer division)
-    | Mod     -- ^ a % b
     | IDiv32  -- ^ a `quot` b with a and b 32-bit integers
 
     -- Boolean operations
