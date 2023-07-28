@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -7,7 +8,20 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Nightfall.MASM.Types where
+module Nightfall.MASM.Types
+    ( module Nightfall.MASM.Types
+    , StackIndex
+    , unStackIndex
+    , toStackIndex
+    , unsafeToStackIndex
+    , MemoryIndex
+    , unMemoryIndex
+    , toMemoryIndex
+    , unsafeToMemoryIndex
+    ) where
+
+import Nightfall.MASM.Integral
+import Nightfall.Lang.Types
 
 import Control.Monad.Writer.Strict
 import qualified Data.DList as DList
@@ -47,32 +61,32 @@ data Instruction
         elseBranch :: [Instruction]
       }
   | While [Instruction] -- while.true
-  | AdvPush Word32 -- adv_push.n
-  | Push Word32 -- push.n
-  | Swap Word32 -- swap[.i]
+  | AdvPush (StackIndex 1 16)  -- adv_push.n
+  | Push Felt -- push.n
+  | Swap (StackIndex 1 15) -- swap[.i]
   | Drop -- drop
   | CDrop -- cdrop
-  | Dup Word32 -- dup.n
-  | MoveUp Word32 -- movup.n
-  | MoveDown Word32 -- movdn.n
+  | Dup (StackIndex 0 15) -- dup.n
+  | MoveUp (StackIndex 2 15) -- movup.n
+  | MoveDown (StackIndex 2 15) -- movdn.n
   | TruncateStack -- exec.sys::truncate_stack
   | SDepth -- sdepth
-  | Eq (Maybe Word32) -- eq[.n]
-  | NEq (Maybe Word32) -- neq[.n]
+  | Eq (Maybe Felt) -- eq[.n]
+  | NEq (Maybe Felt) -- neq[.n]
   | Lt -- lt
   | Lte -- lte
   | Gt -- gt
   | Gte -- gte
   | Not -- not
   | IsOdd -- is_odd
-  | LocStore Word32 -- loc_store.i
-  | LocLoad Word32 -- loc_load.i
-  | MemLoad (Maybe Word32) -- mem_load[.i]
-  | MemStore (Maybe Word32) -- mem_store[.i]
-  | Add (Maybe Word32) -- add[.n]
-  | Sub (Maybe Word32) -- sub[.n]
-  | Mul (Maybe Word32) -- mul[.n]
-  | Div (Maybe Word32) -- div[.n]
+  | LocStore MemoryIndex -- loc_store.i
+  | LocLoad MemoryIndex -- loc_load.i
+  | MemLoad (Maybe MemoryIndex) -- mem_load[.i]
+  | MemStore (Maybe MemoryIndex) -- mem_store[.i]
+  | Add (Maybe Felt) -- add[.n]
+  | Sub (Maybe Felt) -- sub[.n]
+  | Mul (Maybe Felt) -- mul[.n]
+  | Div (Maybe Felt) -- div[.n]
   | Neg
   | IAdd -- u32checked_add
   | ISub -- "u32checked_sub"

@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeOperators #-}
+
 module Nightfall.Lang.Types ( Felt
                             , VarName
                             , FunName
@@ -23,8 +25,7 @@ module Nightfall.Lang.Types ( Felt
                             , varF
                             , varB
                             -- , fcall
-                            , nextSecretF
-                            , nextSecretB
+                            , nextSecret
                             , declareVarF
                             , declareVarB
                             , assignVarF
@@ -45,22 +46,22 @@ module Nightfall.Lang.Types ( Felt
                             ) where
 
 import Nightfall.Lang.Internal.Types
-import Data.Coerce ( coerce )
-import Data.Word ( Word64 )
+
+import Data.Word (Word32)
+import Data.Coerce (coerce)
 
 -- | Expression wrapper type, typed for safety, exposed to use
 newtype Expr a = Expr Expr_
   deriving (Eq, Show)
 
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
-instance Num a => Num (Expr a) where
+instance a ~ Felt => Num (Expr a) where
   (+) = add
   (-) = sub
   (*) = mul
-  abs = id
-  -- fromInteger x = Expr (Lit (fromInteger x))
-  fromInteger = Expr . Lit . fromInteger
-  signum _ = error "Signum not implemented for Expr"
+  fromInteger = Expr . Lit . toFelt
+  abs = error "'abs' not implemented for 'Expr'"
+  signum = error "'signum' not implemented for 'Expr'"
 
 -- | Statement wrapper type, typed for safety, exposed to use
 newtype Statement = Statement Statement_
@@ -96,7 +97,7 @@ mkZKProgram name stmts pubs secretFP = ZKProgram
 
 -- ** Literals
 
-lit :: Word64 -> Expr Felt
+lit :: Felt -> Expr Felt
 lit = Expr . Lit
 
 bool :: Bool -> Expr Bool
@@ -104,42 +105,42 @@ bool = Expr . Bo
 
 -- ** Arithmetic operations
 
-add :: Num a => Expr a -> Expr a -> Expr a
+add :: Expr Felt -> Expr Felt -> Expr Felt
 add  (Expr e1) (Expr e2) = Expr $ BinOp Add e1 e2
 
-sub :: Num a => Expr a -> Expr a -> Expr a
+sub :: Expr Felt -> Expr Felt -> Expr Felt
 sub (Expr e1) (Expr e2)= Expr $ BinOp Sub e1 e2
 
-mul :: Num a => Expr a -> Expr a -> Expr a
+mul :: Expr Felt -> Expr Felt -> Expr Felt
 mul (Expr e1) (Expr e2) = Expr $ BinOp Mul e1 e2
 
-div' :: Num a => Expr a -> Expr a -> Expr a
+div' :: Expr Felt -> Expr Felt -> Expr Felt
 div' (Expr e1) (Expr e2) = Expr $ BinOp Div e1 e2
 
-idiv32 :: Integral a => Expr a -> Expr a -> Expr a
+idiv32 :: Expr Word32 -> Expr Word32 -> Expr Word32
 idiv32 (Expr e1) (Expr e2) = Expr $ BinOp IDiv32 e1 e2
 
 -- ** Boolean operations
 
-eq :: Eq a => Expr a -> Expr a -> Expr Bool
+eq :: Expr Felt -> Expr Felt -> Expr Bool
 eq (Expr e1) (Expr e2)= Expr $ BinOp Equal e1 e2
 
 not' :: Expr Bool -> Expr Bool
 not' (Expr e) = Expr $ UnOp Not e
 
-lt :: Ord a => Expr a -> Expr a -> Expr Bool
+lt :: Expr Felt -> Expr Felt -> Expr Bool
 lt (Expr e1) (Expr e2)= Expr $ BinOp Lower e1 e2
 
-lte :: Ord a => Expr a -> Expr a -> Expr Bool
+lte :: Expr Felt -> Expr Felt -> Expr Bool
 lte (Expr e1) (Expr e2) = Expr $ BinOp LowerEq e1 e2
 
-gt :: Ord a => Expr a -> Expr a -> Expr Bool
+gt :: Expr Felt -> Expr Felt -> Expr Bool
 gt (Expr e1) (Expr e2) = Expr $ BinOp Greater e1 e2
 
-gte :: Ord a => Expr a -> Expr a -> Expr Bool
+gte :: Expr Felt -> Expr Felt -> Expr Bool
 gte (Expr e1) (Expr e2) = Expr $ BinOp GreaterEq e1 e2
 
-isOdd :: Num a => Expr a -> Expr Bool
+isOdd :: Expr Felt -> Expr Bool
 isOdd (Expr e) = Expr $ UnOp IsOdd e
 
 -- ** Variables (typed)
@@ -157,11 +158,8 @@ varB = Expr . VarB
 
 -- ** Secret input
 
-nextSecretF :: Expr Felt
-nextSecretF = Expr NextSecret
-
-nextSecretB :: Expr Bool
-nextSecretB = Expr NextSecret
+nextSecret :: Expr a
+nextSecret = Expr NextSecret
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
 

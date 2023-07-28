@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -11,17 +12,13 @@ module Nightfall.Targets.Miden ( Context(..)
 import Nightfall.Lang.Internal.Types as NFTypes
 import Nightfall.Lang.Types
 import Nightfall.MASM.Types as MASM
-import Control.Monad ( when, unless )
+import Control.Monad ( when )
 import Control.Monad.State
 import Data.Map ( Map )
 import qualified Data.Map as Map
 import qualified Data.Text.Lazy as Text
-import Data.Word ( Word64 )
 import Data.List ( singleton )
 import Data.Coerce ( coerce )
-
--- | Index in Miden's global memory (accessed via mem_load, mem_store, etc.)
-type MemIdx = Word64
 
 -- | Transpilation configuration options
 data Config = Config {
@@ -37,16 +34,19 @@ defaultConfig = Config
 
 -- | Context for the transpilation, this is the state of the State Monad in which transpilation happens
 data Context = Context
-    { progName :: String             -- ^ Name of the program, for outputs logs, etc.
-    , memPos :: MemIdx               -- ^ Next free indice in Miden's global memory
-    , variables :: Map String MemIdx -- ^ Variables in the EDSL are stored in Miden's random access memory, we keep a map to match them
-    , config :: Config               -- ^ Transpilation configuration options
+    { progName :: String                   -- ^ Name of the program, for outputs logs, etc.
+    , memPos :: MemoryIndex                -- ^ Next free indice in Miden's global memory
+    , variables :: Map String MemoryIndex  -- ^ Variables in the EDSL are stored in Miden's random
+                                             -- access memory, we keep a map to match them
+    , config :: Config                     -- ^ Transpilation configuration options
     }
 
 defaultContext :: Context
 defaultContext = Context
     { progName = "<unnamed-program>"
-    , memPos = 0
+    , memPos = case toMemoryIndex 0 of
+            Nothing  -> error "Internal error: wrong index for initial memory position"
+            Just pos -> pos
     , variables = Map.empty
     , config = defaultConfig
     }
@@ -89,7 +89,12 @@ transpileStatement (DeclVariable varname e) = do
     let vars' = Map.insert varname pos vars
 
     -- Update the context
-    modify $ \s -> s { memPos = pos + 1, variables = vars' }
+    modify $ \s -> s
+        { memPos = case toMemoryIndex $ unMemoryIndex pos + 1 of
+                Nothing   -> error "Out of Miden's memory"
+                Just pos' -> pos'
+        , variables = vars'
+        }
 
     -- Trace the variable declaration if configured
     let traceVar = [MASM.Comment $ "var " <> Text.pack varname | cgfTraceVariablesDecl cfg]
@@ -98,29 +103,24 @@ transpileStatement (DeclVariable varname e) = do
     e' <- transpileExpr e
 
     -- Return instruction for the variable value and instruction to store the value in global memory
-    return $ e' <> traceVar <> [ MASM.MemStore . Just . fromIntegral $ pos ]
-
-    -- Add Miden's instructions to load the value in global memory
-    -- return . singleton . MASM.MemStore . Just . fromIntegral $ pos
+    return $ e' <> traceVar <> [ MASM.MemStore . Just $ pos ]
 
 -- | Assigning a new value to a variable if just erasing the memory location
 transpileStatement (AssignVar varname e) = do
     vars <- gets variables
     shouldTrace <- gets (cfgTraceVariablesUsage . config)
-
-    -- Check that this variable exists (has been declared before)
-    unless (Map.member varname vars) $ do
-        error $ "Variable \"" ++ varname ++ "\" has not been declared before: can't assign value"
-    
-    -- Fetch the memory location for that variable
-    let (Just pos) = Map.lookup varname vars -- safe to patter match Just since we checked with Map.member before
-
-    -- Trace the variable usage if configured
-        traceVar = [MASM.Comment $ "var " <> Text.pack varname | shouldTrace]
-    
-    e' <- transpileExpr e
-
-    return $ e' <> traceVar <> [ MASM.MemStore . Just . fromIntegral $ pos ]
+    -- Fetch the memory location for that variable.
+    case Map.lookup varname vars of
+        Nothing -> error $ concat @[]
+            [ "Variable \""
+            , varname
+            , "\" has not been declared before: can't assign value"
+            ]
+        Just pos -> do
+            -- Trace the variable usage if configured
+            let traceVar = [MASM.Comment $ "var " <> Text.pack varname | shouldTrace]
+            e' <- transpileExpr e
+            return $ e' <> traceVar <> [ MASM.MemStore . Just $ pos ]
 
 -- | A (naked) function call is done by pushing the argument on the stack and caling the procedure name
 transpileStatement (NakedCall fname args) = do
@@ -160,7 +160,7 @@ transpileExpr :: Expr_ -> State Context [Instruction]
 -- transpileExpr (Bo _)  = error "Can't transpile standalone boolean"
 -- | Literals are simply pushed onto the stack
 transpileExpr (Lit felt) = do
-    return . singleton . Push . fromIntegral $ felt
+    return . singleton . Push $ felt
 transpileExpr (Bo bo) = do
     let felt = if bo then 1 else 0
     return . singleton . Push $ felt
@@ -173,7 +173,7 @@ transpileExpr (VarF varname) = do
         Just idx -> do
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar = [MASM.Comment $ "var " <> Text.pack varname <> " (felt)" | shouldTrace]
-            return $ traceVar <> [MemLoad . Just . fromIntegral $ idx]
+            return $ traceVar <> [MemLoad . Just $ idx]
 transpileExpr (VarB varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack
     vars <- gets variables
@@ -182,7 +182,7 @@ transpileExpr (VarB varname) = do
         Just idx -> do
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar = [MASM.Comment $ "var " <> Text.pack varname <> " (bool)" | shouldTrace]
-            return $ traceVar <> [MemLoad . Just . fromIntegral $ idx]
+            return $ traceVar <> [MemLoad . Just $ idx]
 transpileExpr (UnOp op e) = do
     es <- transpileExpr e
     return $ es <> transpileUnOp op
@@ -190,6 +190,9 @@ transpileExpr (BinOp op e1 e2) = do
     e1s <- transpileExpr e1
     e2s <- transpileExpr e2
     return $ e1s <> e2s <> transpileBinOp op
-transpileExpr NextSecret = return . singleton . MASM.AdvPush $ 1
+transpileExpr NextSecret =
+    case toStackIndex 1 of
+        Nothing  -> error "Internal error: wrong index for 'AdvPush'"
+        Just idx -> return . singleton . MASM.AdvPush $ idx
 
 transpileExpr FCall{} = error "transpileExpr::TODO"

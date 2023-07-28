@@ -1,9 +1,13 @@
-module Nightfall.Lang.Internal.Types where
+module Nightfall.Lang.Internal.Types
+    ( module Nightfall.Lang.Internal.Types
+    , Felt
+    , unFelt
+    , feltOrder
+    , feltOrderInteger
+    , toFelt
+    ) where
 
-import Data.Word ( Word64 )
-
--- | Field Element type
-type Felt = Word64
+import Nightfall.Lang.Internal.Felt
 
 type VarName = String
 
@@ -22,7 +26,7 @@ data BinOp =
     | Sub     -- ^ a - b
     | Mul     -- ^ a * b
     | Div     -- ^ a / b (integer division)
-    | IDiv32  -- ^ a `quot` b with a and b 32-bit integers
+    | IDiv32  -- ^ a `quot` b with a and b being 'Word32'
 
     -- Boolean operations
     | Equal      -- ^ a == b
@@ -35,7 +39,7 @@ data BinOp =
 -- | Expression, internal type, not exposed
 data Expr_ =
     -- | Literals
-      Lit Felt  -- ^ 309183, 2398713, whatever NOTE: we might want to use explicit types like W32, W64, etc.?
+      Lit Felt  -- ^ 309183, 2398713, whatever
     | Bo Bool   -- ^ true/false, 1/0
 
     | UnOp UnOp Expr_

@@ -22,25 +22,29 @@ common dev-flags
 library
     import:           warnings
     import:           dev-flags
-    exposed-modules:  Nightfall,
-                      Nightfall.MASM,
-                      Nightfall.MASM.Callgraph,
-                      Nightfall.MASM.Miden,
-                      Nightfall.MASM.Types,
-                      Nightfall.Lang.Types,
-                      Nightfall.Targets.Miden,
-                      Examples.Simple,
-                      Examples.Cond,
-                      Examples.Loops,
-                      Examples.Fun,
+    exposed-modules:
+                      Examples.Cond
+                      Examples.Fun
                       Examples.Inputs
-    other-modules:    Nightfall.Lang.Internal.Types,
+                      Examples.Loops
+                      Examples.Simple
+                      Nightfall
+                      Nightfall.Lang.Internal.Felt
+                      Nightfall.Lang.Internal.Types
+                      Nightfall.Lang.Types
+                      Nightfall.MASM
+                      Nightfall.MASM.Callgraph
+                      Nightfall.MASM.Integral
+                      Nightfall.MASM.Miden
+                      Nightfall.MASM.Types
+                      Nightfall.Targets.Miden
     -- other-extensions:
     build-depends:    base >=4.16 && <5
                     , containers
                     , directory
                     , dlist
                     , filepath
+                    , galois-field
                     , mtl
                     , process
                     , temporary

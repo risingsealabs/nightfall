@@ -68,7 +68,7 @@ ppInstr (LocLoad n) = [ "loc_load." ++ show n ]
 
 ppInstr (AdvPush n) = [ "adv_push." ++ show n ]
 ppInstr (Push n) = [ "push." ++ show n ]
-ppInstr (Swap n) = [ "swap" ++ if n == 1 then "" else "." ++ show n ]
+ppInstr (Swap n) = [ "swap" ++ if unStackIndex n == 1 then "" else "." ++ show n ]
 ppInstr Drop = "drop"
 ppInstr CDrop = "cdrop"
 ppInstr (Dup n) = [ "dup." ++ show n ]
