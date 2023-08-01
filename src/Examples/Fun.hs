@@ -53,7 +53,7 @@ collatzPrivStmts :: [Statement]
 collatzPrivStmts = [ comment "Compute the Collatz sequence, starting position taken from secret input"
                   , comment "It returns the length of the sequence"
                   , emptyLine
-                  , declareVarF "start" nextSecretF
+                  , declareVarF "start" nextSecret
                   , declareVarF "n" (varF "start")
                   , declareVarF "length" 1
                   , while (varF "n" `gt` 1) [ incVarF "length" 1
