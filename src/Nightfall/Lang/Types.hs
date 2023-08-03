@@ -59,7 +59,7 @@ instance a ~ Felt => Num (Expr a) where
   (+) = add
   (-) = sub
   (*) = mul
-  fromInteger = Expr . Lit . toFelt
+  fromInteger = Expr . Lit . fromInteger
   abs = error "'abs' not implemented for 'Expr'"
   signum = error "'signum' not implemented for 'Expr'"
 

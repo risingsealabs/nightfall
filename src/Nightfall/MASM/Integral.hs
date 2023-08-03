@@ -21,7 +21,7 @@ newtype StackIndex (lower :: Nat) (upper :: Nat) = StackIndex Word8
 unStackIndex :: StackIndex lower upper -> Integer
 unStackIndex = coerce (toInteger :: Word8 -> Integer)
 
--- See Note [Handling on integral types].
+-- See Note [Handling of integral types].
 -- | Unwrap a 'StackIndex' to get the underlying 'Word8'. This is only unsafe in the sense that
 -- performing operations over the resulting 'Word8' may result in overflow and hence usage of
 -- 'unsafeStackIndex' is discouraged. Use 'unStackIndex' whenever possible instead.
@@ -40,7 +40,7 @@ toStackIndex i
         lower = toInteger . natVal $ Proxy @lower
         upper = toInteger . natVal $ Proxy @upper
 
--- See Note [Handling on integral types].
+-- See Note [Handling of integral types].
 -- | Convert an 'Integer' to the corresponding 'StackIndex'. Silently overflows if the integer
 -- doesn't fit into 'StackIndex'. Use 'toStackIndex' whenever possible instead.
 unsafeToStackIndex :: Integer -> StackIndex lower upper
@@ -54,7 +54,7 @@ newtype MemoryIndex = MemoryIndex Word32
 unMemoryIndex :: MemoryIndex -> Integer
 unMemoryIndex = coerce (toInteger :: Word32 -> Integer)
 
--- See Note [Handling on integral types].
+-- See Note [Handling of integral types].
 -- | Unwrap a 'MemoryIndex' to get the underlying 'Word32'. This is only unsafe in the sense that
 -- performing operations over the resulting 'Word32' may result in overflow and hence usage of
 -- 'unsafeMemoryIndex' is discouraged. Use 'unMemoryIndex' whenever possible instead.
@@ -66,7 +66,7 @@ unsafeUnMemoryIndex = coerce
 toMemoryIndex :: Integer -> Maybe MemoryIndex
 toMemoryIndex = coerce (toIntegralSized :: Integer -> Maybe Word32)
 
--- See Note [Handling on integral types].
+-- See Note [Handling of integral types].
 -- | Convert an 'Integer' to the corresponding 'MemoryIndex'. Silently overflows if the integer
 -- doesn't fit into 'MemoryIndex'. Use 'toMemoryIndex' whenever possible instead.
 unsafeToMemoryIndex :: Integer -> MemoryIndex
