@@ -4,7 +4,6 @@ module Nightfall.Lang.Internal.Types
     , unFelt
     , feltOrder
     , feltOrderInteger
-    , toFelt
     ) where
 
 import Nightfall.Lang.Internal.Felt
