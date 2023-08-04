@@ -18,20 +18,20 @@ collatzFixed = collatz' 10
 -}
 
 -- | DSL version
-collatzFixedStmts :: [Statement]
-collatzFixedStmts = [ comment "Compute the Collatz sequence, starting from a fixed position: 10 and returns the length of the sequence."
-                    , comment "It should return 7"
-                    , emptyLine
-                    , declareVarF "start" 10
-                    , declareVarF "length" 1
-                    , declareVarF "n" (varF "start")
-                    , while (varF "n" `gt` 1) [ assignVarF "length" (varF "length" + 1)
-                                              , ifElse (isOdd (varF "n"))
-                                                 [assignVarF "n" (varF "n" * 3 + 1)]
-                                                 [assignVarF "n" (varF "n" `div'` 2)]
-                                                ]
-                    , ret . Just $ varF "length"
-                     ]
+collatzFixedStmts :: Body
+collatzFixedStmts = do
+    comment "Compute the Collatz sequence, starting from a fixed position: 10 and returns the length of the sequence."
+    comment "It should return 7"
+    emptyLine
+    declareVarF "start" 10
+    declareVarF "length" 1
+    declareVarF "n" (varF "start")
+    while (varF "n" `gt` 1) $ do
+        assignVarF "length" (varF "length" + 1)
+        ifElse (isOdd (varF "n"))
+            (assignVarF "n" (varF "n" * 3 + 1))
+            (assignVarF "n" (varF "n" `div'` 2))
+    ret . Just $ varF "length"
 
 collatzFixedProg :: ZKProgram
 collatzFixedProg = mkSimpleProgram "Fixed Collatz (10)" collatzFixedStmts
@@ -49,22 +49,22 @@ collatzPriv n = collatz' n
 -}
 
 -- | DSL version
-collatzPrivStmts :: [Statement]
-collatzPrivStmts = [ comment "Compute the Collatz sequence, starting position taken from secret input"
-                  , comment "It returns the length of the sequence"
-                  , emptyLine
-                  , declareVarF "start" nextSecret
-                  , declareVarF "n" (varF "start")
-                  , declareVarF "length" 1
-                  , while (varF "n" `gt` 1) [ incVarF "length" 1
-                                            , ifElse (isOdd (varF "n"))
-                                             --   [assignVarF "n" (varF "n" * 3 + 1)]
-                                                [updateVarF "n" $ \n -> n * 3 + 1]
-                                             --   [assignVarF "n" (varF "n" `div'` 2)]
-                                                [updateVarF "n" $ \n -> n `div'` 2]
-                                            ]
-                  , ret . Just $ varF "length"
-                  ]
+collatzPrivStmts :: Body
+collatzPrivStmts = do
+    comment "Compute the Collatz sequence, starting position taken from secret input"
+    comment "It returns the length of the sequence"
+    emptyLine
+    declareVarF "start" nextSecret
+    declareVarF "n" (varF "start")
+    declareVarF "length" 1
+    while (varF "n" `gt` 1) $ do
+        incVarF "length" 1
+        ifElse (isOdd (varF "n"))
+            -- (assignVarF "n" (varF "n" * 3 + 1))
+            (updateVarF "n" $ \n -> n * 3 + 1)
+            -- (assignVarF "n" (varF "n" `div'` 2))
+            (updateVarF "n" $ \n -> n `div'` 2)
+    ret . Just $ varF "length"
 
 collatzPrivProg :: ZKProgram
 collatzPrivProg = mkZKProgram "collatz private" collatzPrivStmts [] "collatz_priv_secrets.input"
