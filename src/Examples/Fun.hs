@@ -31,7 +31,7 @@ collatzFixedStmts = do
         ifElse (isOdd (varF "n"))
             (assignVarF "n" (varF "n" * 3 + 1))
             (assignVarF "n" (varF "n" `div'` 2))
-    ret . Just $ varF "length"
+    ret $ varF "length"
 
 collatzFixedProg :: ZKProgram
 collatzFixedProg = mkSimpleProgram "Fixed Collatz (10)" collatzFixedStmts
@@ -64,7 +64,7 @@ collatzPrivStmts = do
             (updateVarF "n" $ \n -> n * 3 + 1)
             -- (assignVarF "n" (varF "n" `div'` 2))
             (updateVarF "n" $ \n -> n `div'` 2)
-    ret . Just $ varF "length"
+    ret $ varF "length"
 
 collatzPrivProg :: ZKProgram
 collatzPrivProg = mkZKProgram "collatz private" collatzPrivStmts [] "collatz_priv_secrets.input"

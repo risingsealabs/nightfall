@@ -22,8 +22,8 @@ simpleIfBody = do
     comment "if (4 == 8) then return 10 else return 20"
     comment "Should return 20"
     ifElse (eq 4 8)
-        (ret . Just $ 10)
-        (ret . Just $ 20)
+        (ret $ 10)
+        (ret $ 20)
 
 simpleIfProg :: ZKProgram
 simpleIfProg = mkSimpleProgram "simple if" simpleIfBody
@@ -58,8 +58,8 @@ ifVarBody = do
     declareVarF "okVal" 10
     declareVarF "nokVal" 20
     ifElse (varF "sum" `eq` varF "target")
-        (ret . Just $ varF "okVal")
-        (ret . Just $ varF "nokVal")
+        (ret $ varF "okVal")
+        (ret $ varF "nokVal")
 
 ifVarProg :: ZKProgram
 ifVarProg = mkSimpleProgram "If with vars" ifVarBody
@@ -84,8 +84,8 @@ simpleInfBody = do
     declareVarF "n1" 4238
     declareVarF "n2" 21987
     ifElse (varF "n1" `lte` varF "n2")
-        (ret . Just $ varF "n1")
-        (ret . Just $ varF "n2")
+        (ret $ varF "n1")
+        (ret $ varF "n2")
 
 simpleInfProg :: ZKProgram
 simpleInfProg = mkSimpleProgram "simple inf" simpleInfBody

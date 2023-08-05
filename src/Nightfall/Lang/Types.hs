@@ -201,8 +201,8 @@ while (Expr cond) body = statement $ While cond (unBody body)
 -- nakedCall :: FunName -> [Expr] -> Body
 -- nakedCall = NakedCall
 
-ret :: Maybe (Expr a)-> Body
-ret = statement . Return . fmap unExpr
+ret :: Expr a -> Body
+ret = statement . Return . unExpr
 
 comment :: String -> Body
 comment = statement . Comment

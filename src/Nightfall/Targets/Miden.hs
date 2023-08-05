@@ -138,11 +138,7 @@ transpileStatement (NakedCall fname args) = do
     args' <- foldMapA transpileExpr args
     return $ args' <> [ MASM.Exec . Text.pack $ fname ]
 
-transpileStatement (Return mE) = case mE of
-    -- an empty return statement doesn't correspond to an action in Miden
-    Nothing -> return []
-    -- When we do have a value, we simply push it to the stack
-    Just e -> transpileExpr e
+transpileStatement (Return e) = transpileExpr e
 
 transpileStatement EmptyLine = return . singleton $ MASM.EmptyL
 

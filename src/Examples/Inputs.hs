@@ -16,7 +16,7 @@ simpleSecretStmts :: Body
 simpleSecretStmts = do
     comment "Simple program that outputs 10x the secret input"
     emptyLine
-    ret . Just $ 10 * nextSecret
+    ret $ 10 * nextSecret
 
 simpleSecretProg :: ZKProgram
 simpleSecretProg = mkZKProgram "simple secret" simpleSecretStmts [] "simple_secrets.inputs"

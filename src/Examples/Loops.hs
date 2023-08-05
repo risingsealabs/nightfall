@@ -24,7 +24,7 @@ sumTo10Stmts = do
     while (varF "n" `gt` 0) $ do
         assignVarF "acc" (varF "acc" + varF "n")
         assignVarF "n" (varF "n" - 1)
-    ret . Just $ varF "acc"
+    ret $ varF "acc"
 
 sumTo10Prog :: ZKProgram
 sumTo10Prog = mkSimpleProgram "Sum to 10" sumTo10Stmts

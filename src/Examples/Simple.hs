@@ -21,7 +21,7 @@ trivial1 = 33 + 42
 trivial1Body :: Body
 trivial1Body = do
     comment "Simply add fixed numbers 33 + 42, should output 75"
-    ret . Just $ add (lit 33) (lit 42)
+    ret $ add (lit 33) (lit 42)
 
 trivial1Prog :: ZKProgram
 trivial1Prog = ZKProgram { pName = "trivial 1"
@@ -42,7 +42,7 @@ trivial2 = 29 + 156 + 14
 trivial2Body :: Body
 trivial2Body = do
     comment "Simply add three numbers, 29 + 156 + 14, should output 199"
-    ret . Just $ add (lit 29) (add (lit 156) (lit 14))
+    ret $ add (lit 29) (add (lit 156) (lit 14))
 
 trivial2Prog :: ZKProgram
 trivial2Prog = ZKProgram { pName = "trivial 2"
@@ -64,7 +64,7 @@ trivial3 = 1238 * (345 + 78)
 trivial3Body :: Body
 trivial3Body = do
     comment "Perform an addition followed by a multipication, 1238 * (345 + 78), should output 523674"
-    ret . Just $ mul (lit 1238) (add (lit 345) (lit 78))
+    ret $ mul (lit 1238) (add (lit 345) (lit 78))
 
 trivial3Prog :: ZKProgram
 trivial3Prog = ZKProgram { pName = "trivial 3"
@@ -85,7 +85,7 @@ trivial4 = 52 * (11 - 1)
 trivial4Body :: Body
 trivial4Body = do
     comment "Performs 52 * (11 - 1), written with Num instance, should output 520"
-    ret . Just $ 52 * (11 - 1)
+    ret $ 52 * (11 - 1)
 
 trivial4Prog :: ZKProgram
 trivial4Prog = ZKProgram { pName = "trivial 4"
@@ -111,7 +111,7 @@ simpleVar1Body = do
     comment "a = 999"
     comment "a + 1. It should return 1000"
     declareVarF "a" (lit 999)
-    ret . Just $ add (varF "a") (lit 1)
+    ret $ add (varF "a") (lit 1)
 
 simpleVar1Prog :: ZKProgram
 simpleVar1Prog = ZKProgram { pName = "simple var 1"
@@ -143,7 +143,7 @@ simpleVar2Body = do
     declareVarF "a" 888
     declareVarF "b" 222
     declareVarF "c" (varF "a" - varF "b")
-    ret . Just $ varF "c"
+    ret $ varF "c"
 
 simpleVar2Prog :: ZKProgram
 simpleVar2Prog = ZKProgram { pName = "simple var 2"
@@ -161,7 +161,7 @@ simpleVar3Body = do
     declareVarF "a" 10
     declareVarF "b" 20
     assignVarF "a" 50
-    ret . Just $ varF "a" + varF "b"
+    ret $ varF "a" + varF "b"
 
 simpleVar3Prog :: ZKProgram
 simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Body
