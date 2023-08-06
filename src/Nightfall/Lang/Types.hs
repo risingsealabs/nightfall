@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Nightfall.Lang.Types ( Felt
@@ -8,8 +10,8 @@ module Nightfall.Lang.Types ( Felt
                             , Expr(..)
                             , ZKProgram(..)
                             , BodyF(..)
-                            , Body
-                            , unBody
+                            , Body(..)
+                            , runBody
                             , mkSimpleProgram
                             , mkZKProgram
                             , lit
@@ -29,6 +31,7 @@ module Nightfall.Lang.Types ( Felt
                             , varF
                             , varB
                             , statement
+                            , statements
                             -- , fcall
                             , nextSecret
                             , declareVarF
@@ -52,6 +55,7 @@ module Nightfall.Lang.Types ( Felt
 
 import Nightfall.Lang.Internal.Types
 
+import Data.Foldable
 import Control.Monad.Free.Church
 import Data.Word (Word32)
 
@@ -72,7 +76,15 @@ instance a ~ Felt => Num (Expr a) where
 data BodyF a = BodyF Statement_ a
   deriving (Eq, Show, Functor)
 
-type Body = F BodyF
+-- | A 'Body' represents a list of 'Statement_'s. We do not simply use @[Statement_]@, because
+--
+-- 1. a 'Body' can be constructed using the do notation, which is much nicer than the list syntax
+-- 2. concatenation of 'Body's is more efficient than concatentation of lists, because 'Body' is
+--    implemented as a Church-encoded free monad (which is to the regular free monad what @DList@ is
+--    to @[]@).
+newtype Body a = Body
+    { unBody :: F BodyF a
+    } deriving newtype (Functor, Applicative, Monad)
 
 data ZKProgram = ZKProgram
     { pName :: String            -- ^ Program name, is this needed?
@@ -170,11 +182,17 @@ nextSecret = Expr NextSecret
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
 
+-- | Turn a 'Statement_' into a 'Body' representing the statement.
 statement :: Statement_ -> Body ()
-statement stmt = liftF $ BodyF stmt ()
+statement stmt = Body . liftF $ BodyF stmt ()
 
-unBody :: Body () -> [Statement_]
-unBody body = runF body (const []) $ \(BodyF stmt stmts) -> stmt : stmts
+-- | Turn a list of 'Statement_'s into a 'Body' representing the statements.
+statements :: [Statement_] -> Body ()
+statements = traverse_ statement
+
+-- | Turn a 'Body' into the list of 'Statement_'s that it represents.
+runBody :: Body () -> [Statement_]
+runBody body = runF (unBody body) (const []) $ \(BodyF stmt stmts) -> stmt : stmts
 
 -- ** Variables
 declareVarF :: VarName -> Expr Felt -> Body ()
@@ -190,14 +208,14 @@ assignVarB :: VarName -> Expr Bool -> Body ()
 assignVarB varname (Expr e) = statement $ AssignVar varname e
 
 ifElse :: Expr Bool -> Body () -> Body () -> Body ()
-ifElse (Expr cond) ifBlock elseBlock = statement $ IfElse cond (unBody ifBlock) (unBody elseBlock)
+ifElse (Expr cond) ifBlock elseBlock = statement $ IfElse cond (runBody ifBlock) (runBody elseBlock)
 
 -- | A constructor for when you don't want 'else' statement
 simpleIf :: Expr Bool -> Body () -> Body ()
 simpleIf cond ifBlock = ifElse cond ifBlock $ pure ()
 
 while :: Expr Bool -> Body () -> Body ()
-while (Expr cond) body = statement $ While cond (unBody body)
+while (Expr cond) body = statement $ While cond (runBody body)
 
 -- nakedCall :: FunName -> [Expr] -> Body ()
 -- nakedCall = NakedCall
