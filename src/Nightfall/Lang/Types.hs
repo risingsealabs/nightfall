@@ -5,7 +5,7 @@ module Nightfall.Lang.Types ( Felt
                             , VarName
                             , FunName
                             , Statement_
-                            , Expr
+                            , Expr(..)
                             , ZKProgram(..)
                             , BodyF(..)
                             , Body
@@ -28,6 +28,7 @@ module Nightfall.Lang.Types ( Felt
                             , isOdd
                             , varF
                             , varB
+                            , statement
                             -- , fcall
                             , nextSecret
                             , declareVarF
@@ -71,17 +72,17 @@ instance a ~ Felt => Num (Expr a) where
 data BodyF a = BodyF Statement_ a
   deriving (Eq, Show, Functor)
 
-type Body = F BodyF ()
+type Body = F BodyF
 
 data ZKProgram = ZKProgram
     { pName :: String            -- ^ Program name, is this needed?
-    , pBody :: Body              -- ^ List of statements comprising the program
+    , pBody :: Body ()              -- ^ List of statements comprising the program
     , pPublicInputs :: [Felt]    -- ^ Defining the public inputs as a list of field elements for now
     , pSecretInputs :: FilePath  -- ^ For now, for simplicty, we'll be referring to a '.inputs' file
     }
 
 -- | Helper to quickly make a simple @ZKProgram from a list of statements, no inputs
-mkSimpleProgram :: String -> Body -> ZKProgram
+mkSimpleProgram :: String -> Body () -> ZKProgram
 mkSimpleProgram name body = ZKProgram
     { pName = name
     , pBody = body
@@ -90,7 +91,7 @@ mkSimpleProgram name body = ZKProgram
     }
 
 -- | Helper to build a @ZKPeogram
-mkZKProgram :: String -> Body -> [Felt] -> FilePath -> ZKProgram
+mkZKProgram :: String -> Body () -> [Felt] -> FilePath -> ZKProgram
 mkZKProgram name body pubs secretFP = ZKProgram
     { pName = name
     , pBody = body
@@ -169,74 +170,74 @@ nextSecret = Expr NextSecret
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
 
-statement :: Statement_ -> Body
+statement :: Statement_ -> Body ()
 statement stmt = liftF $ BodyF stmt ()
 
-unBody :: Body -> [Statement_]
+unBody :: Body () -> [Statement_]
 unBody body = runF body (const []) $ \(BodyF stmt stmts) -> stmt : stmts
 
 -- ** Variables
-declareVarF :: VarName -> Expr Felt -> Body
+declareVarF :: VarName -> Expr Felt -> Body ()
 declareVarF varname (Expr e) = statement $ DeclVariable varname e
 
-declareVarB :: VarName -> Expr Bool -> Body
+declareVarB :: VarName -> Expr Bool -> Body ()
 declareVarB varname (Expr e) = statement $ DeclVariable varname e
 
-assignVarF :: VarName -> Expr Felt -> Body
+assignVarF :: VarName -> Expr Felt -> Body ()
 assignVarF varname (Expr e) = statement $ AssignVar varname e
 
-assignVarB :: VarName -> Expr Bool -> Body
+assignVarB :: VarName -> Expr Bool -> Body ()
 assignVarB varname (Expr e) = statement $ AssignVar varname e
 
-ifElse :: Expr Bool -> Body -> Body -> Body
+ifElse :: Expr Bool -> Body () -> Body () -> Body ()
 ifElse (Expr cond) ifBlock elseBlock = statement $ IfElse cond (unBody ifBlock) (unBody elseBlock)
 
 -- | A constructor for when you don't want 'else' statement
-simpleIf :: Expr Bool -> Body -> Body
+simpleIf :: Expr Bool -> Body () -> Body ()
 simpleIf cond ifBlock = ifElse cond ifBlock $ pure ()
 
-while :: Expr Bool -> Body -> Body
+while :: Expr Bool -> Body () -> Body ()
 while (Expr cond) body = statement $ While cond (unBody body)
 
--- nakedCall :: FunName -> [Expr] -> Body
+-- nakedCall :: FunName -> [Expr] -> Body ()
 -- nakedCall = NakedCall
 
-ret :: Expr a -> Body
+ret :: Expr a -> Body ()
 ret = statement . Return . unExpr
 
-comment :: String -> Body
+comment :: String -> Body ()
 comment = statement . Comment
 
-emptyLine :: Body
+emptyLine :: Body ()
 emptyLine = statement EmptyLine
 
 -- ** A few helpers for common code patterns
 
 -- | Apply a function of 1 argument over @var and store result in @targetVar
-withVarF :: VarName -> VarName -> (Expr Felt -> Expr Felt) -> Body
+withVarF :: VarName -> VarName -> (Expr Felt -> Expr Felt) -> Body ()
 withVarF var targetVar f = assignVarF targetVar $ f . varF $ var
 
 -- | Apply a function of 2 arguments over two variables and store result in @targetVar
-withVarF2 :: (VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt) -> Body
+withVarF2 :: (VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt) -> Body ()
 withVarF2 (var1, var2) targetVar f = assignVarF targetVar $ f (varF var1) (varF var2)
 
 -- | Apply a function of 3 arguments over three variables and store result in @targetVar
-withVarF3 :: (VarName, VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt -> Expr Felt) -> Body
+withVarF3 :: (VarName, VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt -> Expr Felt) -> Body ()
 withVarF3 (var1, var2, var3) targetVar f = assignVarF targetVar $ f (varF var1) (varF var2) (varF var3)
 
 -- | Shorthand to update a variable value with a computation (which might depend on its current value)
 -- It's shorter and easier to write 'updateVarF "cnt" $ \n -> 3 * n + 1' than writing 'assignVarF "cnt" (varF "cnt" * 3 + 1)'
 -- especially if we use the variable value several times
-updateVarF :: VarName -> (Expr Felt -> Expr Felt) -> Body
+updateVarF :: VarName -> (Expr Felt -> Expr Felt) -> Body ()
 -- updateVarF varname f = assignVarF varname (f (varF varname))
 updateVarF varname = withVarF varname varname
 
 -- | Shorthand to increment a variable (i += n)
 -- It's shorter and easier to write 'incVarF "i" 1' than writing 'assignVarF "i" (varF "i" + 1)`
-incVarF :: VarName -> Felt -> Body
+incVarF :: VarName -> Felt -> Body ()
 -- incVarF varname val = assignVarF varname (varF varname + (Expr . Lit $ val))
 incVarF varname val = updateVarF varname (`add` lit val)
 
 -- | Same as above, but for decrementing
-decVarF :: VarName -> Felt -> Body
+decVarF :: VarName -> Felt -> Body ()
 decVarF varname val = updateVarF varname (`sub` lit val)

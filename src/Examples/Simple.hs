@@ -18,7 +18,7 @@ trivial1 = 33 + 42
 -}
 
 -- | That's the EDSL version
-trivial1Body :: Body
+trivial1Body :: Body ()
 trivial1Body = do
     comment "Simply add fixed numbers 33 + 42, should output 75"
     ret $ add (lit 33) (lit 42)
@@ -39,7 +39,7 @@ trivial2 = 29 + 156 + 14
 -}
 
 -- | That's the EDSL version
-trivial2Body :: Body
+trivial2Body :: Body ()
 trivial2Body = do
     comment "Simply add three numbers, 29 + 156 + 14, should output 199"
     ret $ add (lit 29) (add (lit 156) (lit 14))
@@ -61,7 +61,7 @@ trivial3 = 1238 * (345 + 78)
 -}
 
 -- | That's the EDSL version
-trivial3Body :: Body
+trivial3Body :: Body ()
 trivial3Body = do
     comment "Perform an addition followed by a multipication, 1238 * (345 + 78), should output 523674"
     ret $ mul (lit 1238) (add (lit 345) (lit 78))
@@ -82,7 +82,7 @@ trivial4 = 52 * (11 - 1)
 -}
 
 -- | That's the EDSL version
-trivial4Body :: Body
+trivial4Body :: Body ()
 trivial4Body = do
     comment "Performs 52 * (11 - 1), written with Num instance, should output 520"
     ret $ 52 * (11 - 1)
@@ -105,7 +105,7 @@ simpleVar1 = let a = 999
 
 
 -- EDSL version
-simpleVar1Body :: Body
+simpleVar1Body :: Body ()
 simpleVar1Body = do
     comment "Simple addition, but with a variable storing a value"
     comment "a = 999"
@@ -134,7 +134,7 @@ simpleVar2 = let a = 888
 
 
 -- EDSL version
-simpleVar2Body :: Body
+simpleVar2Body :: Body ()
 simpleVar2Body = do
     comment "Simple subtraction, but uses three variables"
     comment "a = 888, b = 222"
@@ -154,7 +154,7 @@ simpleVar2Prog = ZKProgram { pName = "simple var 2"
 
 -- * Simple program that overwrite the values of a variable several times
 
-simpleVar3Body :: Body
+simpleVar3Body :: Body ()
 simpleVar3Body = do
     comment "Rewrite on the same variable several times"
     comment "a = 10, b = 20, a = 50, a + b. Should return 70"
