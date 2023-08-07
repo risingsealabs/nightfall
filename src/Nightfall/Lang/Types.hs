@@ -1,11 +1,17 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Nightfall.Lang.Types ( Felt
                             , VarName
                             , FunName
-                            , Expr
-                            , Statement(..)
+                            , Statement_
+                            , Expr(..)
                             , ZKProgram(..)
+                            , BodyF(..)
+                            , Body(..)
+                            , runBody
                             , mkSimpleProgram
                             , mkZKProgram
                             , lit
@@ -24,6 +30,8 @@ module Nightfall.Lang.Types ( Felt
                             , isOdd
                             , varF
                             , varB
+                            , statement
+                            , statements
                             -- , fcall
                             , nextSecret
                             , declareVarF
@@ -47,12 +55,14 @@ module Nightfall.Lang.Types ( Felt
 
 import Nightfall.Lang.Internal.Types
 
+import Data.Foldable
+import Control.Monad.Free.Church
 import Data.Word (Word32)
-import Data.Coerce (coerce)
 
 -- | Expression wrapper type, typed for safety, exposed to use
-newtype Expr a = Expr Expr_
-  deriving (Eq, Show)
+newtype Expr a = Expr
+  { unExpr :: Expr_
+  } deriving (Eq, Show)
 
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
 instance a ~ Felt => Num (Expr a) where
@@ -63,31 +73,40 @@ instance a ~ Felt => Num (Expr a) where
   abs = error "'abs' not implemented for 'Expr'"
   signum = error "'signum' not implemented for 'Expr'"
 
--- | Statement wrapper type, typed for safety, exposed to use
-newtype Statement = Statement Statement_
-  deriving (Eq, Show)
+data BodyF a = BodyF Statement_ a
+  deriving (Eq, Show, Functor)
+
+-- | A 'Body' represents a list of 'Statement_'s. We do not simply use @[Statement_]@, because
+--
+-- 1. a 'Body' can be constructed using the do notation, which is much nicer than the list syntax
+-- 2. concatenation of 'Body's is more efficient than concatentation of lists, because 'Body' is
+--    implemented as a Church-encoded free monad (which is to the regular free monad what @DList@ is
+--    to @[]@).
+newtype Body a = Body
+    { unBody :: F BodyF a
+    } deriving newtype (Functor, Applicative, Monad)
 
 data ZKProgram = ZKProgram
     { pName :: String            -- ^ Program name, is this needed?
-    , pStatements :: [Statement] -- ^ List of statements comprising the program
+    , pBody :: Body ()              -- ^ List of statements comprising the program
     , pPublicInputs :: [Felt]    -- ^ Defining the public inputs as a list of field elements for now
     , pSecretInputs :: FilePath  -- ^ For now, for simplicty, we'll be referring to a '.inputs' file
     }
 
 -- | Helper to quickly make a simple @ZKProgram from a list of statements, no inputs
-mkSimpleProgram :: String -> [Statement] -> ZKProgram
-mkSimpleProgram name stmts = ZKProgram
+mkSimpleProgram :: String -> Body () -> ZKProgram
+mkSimpleProgram name body = ZKProgram
     { pName = name
-    , pStatements = stmts
+    , pBody = body
     , pPublicInputs = []
     , pSecretInputs = ""
     }
 
 -- | Helper to build a @ZKPeogram
-mkZKProgram :: String -> [Statement] -> [Felt] -> FilePath -> ZKProgram
-mkZKProgram name stmts pubs secretFP = ZKProgram
+mkZKProgram :: String -> Body () -> [Felt] -> FilePath -> ZKProgram
+mkZKProgram name body pubs secretFP = ZKProgram
     { pName = name
-    , pStatements = stmts
+    , pBody = body
     , pPublicInputs = pubs
     , pSecretInputs = secretFP
     }
@@ -163,69 +182,80 @@ nextSecret = Expr NextSecret
 
 -- * "Smart Constructors" for building (type-safe) @Statement. They are the ones exposed for users to use
 
+-- | Turn a 'Statement_' into a 'Body' representing the statement.
+statement :: Statement_ -> Body ()
+statement stmt = Body . liftF $ BodyF stmt ()
+
+-- | Turn a list of 'Statement_'s into a 'Body' representing the statements.
+statements :: [Statement_] -> Body ()
+statements = traverse_ statement
+
+-- | Turn a 'Body' into the list of 'Statement_'s that it represents.
+runBody :: Body () -> [Statement_]
+runBody body = runF (unBody body) (const []) $ \(BodyF stmt stmts) -> stmt : stmts
+
 -- ** Variables
-declareVarF :: VarName -> Expr Felt -> Statement
-declareVarF varname (Expr e) = Statement $ DeclVariable varname e
+declareVarF :: VarName -> Expr Felt -> Body ()
+declareVarF varname (Expr e) = statement $ DeclVariable varname e
 
-declareVarB :: VarName -> Expr Bool -> Statement
-declareVarB varname (Expr e) = Statement $ DeclVariable varname e
+declareVarB :: VarName -> Expr Bool -> Body ()
+declareVarB varname (Expr e) = statement $ DeclVariable varname e
 
-assignVarF :: VarName -> Expr Felt -> Statement
-assignVarF varname (Expr e) = Statement $ AssignVar varname e
+assignVarF :: VarName -> Expr Felt -> Body ()
+assignVarF varname (Expr e) = statement $ AssignVar varname e
 
-assignVarB :: VarName -> Expr Bool -> Statement
-assignVarB varname (Expr e) = Statement $ AssignVar varname e
+assignVarB :: VarName -> Expr Bool -> Body ()
+assignVarB varname (Expr e) = statement $ AssignVar varname e
 
-ifElse :: Expr Bool -> [Statement] -> [Statement] -> Statement
-ifElse (Expr cond) ifBlock elseBlock = Statement $ IfElse cond (coerce ifBlock) (coerce elseBlock)
+ifElse :: Expr Bool -> Body () -> Body () -> Body ()
+ifElse (Expr cond) ifBlock elseBlock = statement $ IfElse cond (runBody ifBlock) (runBody elseBlock)
 
 -- | A constructor for when you don't want 'else' statement
-simpleIf :: Expr Bool -> [Statement] -> Statement
-simpleIf cond ifBlock = ifElse cond ifBlock []
+simpleIf :: Expr Bool -> Body () -> Body ()
+simpleIf cond ifBlock = ifElse cond ifBlock $ pure ()
 
-while :: Expr Bool -> [Statement] -> Statement
-while (Expr cond) body = Statement $ While cond (coerce body)
+while :: Expr Bool -> Body () -> Body ()
+while (Expr cond) body = statement $ While cond (runBody body)
 
--- nakedCall :: FunName -> [Expr] -> Statement
+-- nakedCall :: FunName -> [Expr] -> Body ()
 -- nakedCall = NakedCall
 
-ret :: Maybe (Expr a)-> Statement
-ret Nothing = Statement $ Return Nothing
-ret (Just (Expr e)) = Statement $ Return (Just e)
+ret :: Expr a -> Body ()
+ret = statement . Return . unExpr
 
-comment :: String -> Statement
-comment = Statement . Comment
+comment :: String -> Body ()
+comment = statement . Comment
 
-emptyLine :: Statement
-emptyLine = Statement EmptyLine
+emptyLine :: Body ()
+emptyLine = statement EmptyLine
 
 -- ** A few helpers for common code patterns
 
 -- | Apply a function of 1 argument over @var and store result in @targetVar
-withVarF :: VarName -> VarName -> (Expr Felt -> Expr Felt) -> Statement
+withVarF :: VarName -> VarName -> (Expr Felt -> Expr Felt) -> Body ()
 withVarF var targetVar f = assignVarF targetVar $ f . varF $ var
 
 -- | Apply a function of 2 arguments over two variables and store result in @targetVar
-withVarF2 :: (VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt) -> Statement
+withVarF2 :: (VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt) -> Body ()
 withVarF2 (var1, var2) targetVar f = assignVarF targetVar $ f (varF var1) (varF var2)
 
 -- | Apply a function of 3 arguments over three variables and store result in @targetVar
-withVarF3 :: (VarName, VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt -> Expr Felt) -> Statement
+withVarF3 :: (VarName, VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt -> Expr Felt) -> Body ()
 withVarF3 (var1, var2, var3) targetVar f = assignVarF targetVar $ f (varF var1) (varF var2) (varF var3)
 
 -- | Shorthand to update a variable value with a computation (which might depend on its current value)
 -- It's shorter and easier to write 'updateVarF "cnt" $ \n -> 3 * n + 1' than writing 'assignVarF "cnt" (varF "cnt" * 3 + 1)'
 -- especially if we use the variable value several times
-updateVarF :: VarName -> (Expr Felt -> Expr Felt) -> Statement
+updateVarF :: VarName -> (Expr Felt -> Expr Felt) -> Body ()
 -- updateVarF varname f = assignVarF varname (f (varF varname))
 updateVarF varname = withVarF varname varname
 
 -- | Shorthand to increment a variable (i += n)
 -- It's shorter and easier to write 'incVarF "i" 1' than writing 'assignVarF "i" (varF "i" + 1)`
-incVarF :: VarName -> Felt -> Statement
+incVarF :: VarName -> Felt -> Body ()
 -- incVarF varname val = assignVarF varname (varF varname + (Expr . Lit $ val))
 incVarF varname val = updateVarF varname (`add` lit val)
 
 -- | Same as above, but for decrementing
-decVarF :: VarName -> Felt -> Statement
+decVarF :: VarName -> Felt -> Body ()
 decVarF varname val = updateVarF varname (`sub` lit val)

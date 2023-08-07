@@ -71,7 +71,7 @@ data Statement_ =
     | NakedCall FunName [Expr_]
 
     -- | Return
-    | Return (Maybe Expr_)
+    | Return Expr_
 
     -- | Comment
     | Comment String

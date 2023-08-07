@@ -18,14 +18,14 @@ trivial1 = 33 + 42
 -}
 
 -- | That's the EDSL version
-trivial1Stmts :: [Statement]
-trivial1Stmts = [ comment "Simply add fixed numbers 33 + 42, should output 75"
-                , ret . Just $ add (lit 33) (lit 42)
-                ]
+trivial1Body :: Body ()
+trivial1Body = do
+    comment "Simply add fixed numbers 33 + 42, should output 75"
+    ret $ add (lit 33) (lit 42)
 
 trivial1Prog :: ZKProgram
 trivial1Prog = ZKProgram { pName = "trivial 1"
-                          , pStatements = trivial1Stmts
+                          , pBody = trivial1Body
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
@@ -39,14 +39,14 @@ trivial2 = 29 + 156 + 14
 -}
 
 -- | That's the EDSL version
-trivial2Stmts :: [Statement]
-trivial2Stmts = [ comment "Simply add three numbers, 29 + 156 + 14, should output 199"
-                , ret . Just $ add (lit 29) (add (lit 156) (lit 14))
-                ]
+trivial2Body :: Body ()
+trivial2Body = do
+    comment "Simply add three numbers, 29 + 156 + 14, should output 199"
+    ret $ add (lit 29) (add (lit 156) (lit 14))
 
 trivial2Prog :: ZKProgram
 trivial2Prog = ZKProgram { pName = "trivial 2"
-                          , pStatements = trivial2Stmts
+                          , pBody = trivial2Body
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
@@ -61,14 +61,14 @@ trivial3 = 1238 * (345 + 78)
 -}
 
 -- | That's the EDSL version
-trivial3Stmts :: [Statement]
-trivial3Stmts = [ comment "Perform an addition followed by a multipication, 1238 * (345 + 78), should output 523674"
-                , ret . Just $ mul (lit 1238) (add (lit 345) (lit 78))
-                ]
+trivial3Body :: Body ()
+trivial3Body = do
+    comment "Perform an addition followed by a multipication, 1238 * (345 + 78), should output 523674"
+    ret $ mul (lit 1238) (add (lit 345) (lit 78))
 
 trivial3Prog :: ZKProgram
 trivial3Prog = ZKProgram { pName = "trivial 3"
-                          , pStatements = trivial3Stmts
+                          , pBody = trivial3Body
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
@@ -82,14 +82,14 @@ trivial4 = 52 * (11 - 1)
 -}
 
 -- | That's the EDSL version
-trivial4Stmts :: [Statement]
-trivial4Stmts = [ comment "Performs 52 * (11 - 1), written with Num instance, should output 520"
-                , ret . Just $ 52 * (11 - 1)
-                ]
+trivial4Body :: Body ()
+trivial4Body = do
+    comment "Performs 52 * (11 - 1), written with Num instance, should output 520"
+    ret $ 52 * (11 - 1)
 
 trivial4Prog :: ZKProgram
 trivial4Prog = ZKProgram { pName = "trivial 4"
-                          , pStatements = trivial4Stmts
+                          , pBody = trivial4Body
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
@@ -105,17 +105,17 @@ simpleVar1 = let a = 999
 
 
 -- EDSL version
-simpleVar1Stmts :: [Statement]
-simpleVar1Stmts = [ comment "Simple addition, but with a variable storing a value"
-                 , comment "a = 999"
-                 , comment "a + 1. It should return 1000"
-                 , declareVarF "a" (lit 999)
-                 , ret . Just $ add (varF "a") (lit 1)
-                 ]
+simpleVar1Body :: Body ()
+simpleVar1Body = do
+    comment "Simple addition, but with a variable storing a value"
+    comment "a = 999"
+    comment "a + 1. It should return 1000"
+    declareVarF "a" (lit 999)
+    ret $ add (varF "a") (lit 1)
 
 simpleVar1Prog :: ZKProgram
 simpleVar1Prog = ZKProgram { pName = "simple var 1"
-                          , pStatements = simpleVar1Stmts
+                          , pBody = simpleVar1Body
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
@@ -134,34 +134,34 @@ simpleVar2 = let a = 888
 
 
 -- EDSL version
-simpleVar2Stmts :: [Statement]
-simpleVar2Stmts = [ comment "Simple subtraction, but uses three variables"
-                 , comment "a = 888, b = 222"
-                 , comment "c = a - b. Return c"
-                 , comment "It should return 666"
-                 , declareVarF "a" 888
-                 , declareVarF "b" 222
-                 , declareVarF "c" (varF "a" - varF "b")
-                 , ret . Just $ varF "c"
-                 ]
+simpleVar2Body :: Body ()
+simpleVar2Body = do
+    comment "Simple subtraction, but uses three variables"
+    comment "a = 888, b = 222"
+    comment "c = a - b. Return c"
+    comment "It should return 666"
+    declareVarF "a" 888
+    declareVarF "b" 222
+    declareVarF "c" (varF "a" - varF "b")
+    ret $ varF "c"
 
 simpleVar2Prog :: ZKProgram
 simpleVar2Prog = ZKProgram { pName = "simple var 2"
-                          , pStatements = simpleVar2Stmts
+                          , pBody = simpleVar2Body
                           , pPublicInputs = []
                           , pSecretInputs = []
                           }
 
 -- * Simple program that overwrite the values of a variable several times
 
-simpleVar3Stmts :: [Statement]
-simpleVar3Stmts = [ comment "Rewrite on the same variable several times"
-                  , comment "a = 10, b = 20, a = 50, a + b. Should return 70"
-                  , declareVarF "a" 10
-                  , declareVarF "b" 20
-                  , assignVarF "a" 50
-                  , ret . Just $ varF "a" + varF "b"
-                  ]
+simpleVar3Body :: Body ()
+simpleVar3Body = do
+    comment "Rewrite on the same variable several times"
+    comment "a = 10, b = 20, a = 50, a + b. Should return 70"
+    declareVarF "a" 10
+    declareVarF "b" 20
+    assignVarF "a" 50
+    ret $ varF "a" + varF "b"
 
 simpleVar3Prog :: ZKProgram
-simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Stmts
+simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Body

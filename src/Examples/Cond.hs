@@ -16,15 +16,17 @@ simpleIf = if 4 == 8
 -}
 
 -- | EDSL version
-simpleIfStmts :: [Statement]
-simpleIfStmts = [ comment "Simple, stupid and trivial program that makes uses of a condition"
-                , comment "if (4 == 8) then return 10 else return 20"
-                , comment "Should return 20"
-                , ifElse (eq 4 8) [ret . Just $ 10] [ret . Just $ 20]
-                ]
+simpleIfBody :: Body ()
+simpleIfBody = do
+    comment "Simple, stupid and trivial program that makes uses of a condition"
+    comment "if (4 == 8) then return 10 else return 20"
+    comment "Should return 20"
+    ifElse (eq 4 8)
+        (ret $ 10)
+        (ret $ 20)
 
 simpleIfProg :: ZKProgram
-simpleIfProg = mkSimpleProgram "simple if" simpleIfStmts
+simpleIfProg = mkSimpleProgram "simple if" simpleIfBody
 
 -- * Simple program that uses one if / else statement on a moderately complex computation involving variables
 
@@ -43,22 +45,24 @@ simpleIf = let a = 145
 -}
 
 -- | EDSL version
-ifVarStmts :: [Statement]
-ifVarStmts = [ comment "Makes a if/else comparison on a moderately complex computation, involving variables"
-             , comment "It sums a=145 + b=79 and compares equality with target=203."
-             , comment "If equal, it returns okVal=10, otherwise nokVal=20"
-             , comment "It should return 20"
-             , declareVarF "a" 145
-             , declareVarF "b" 79
-             , declareVarF "target" 203
-             , declareVarF "sum" (varF "a" + varF "b")
-             , declareVarF "okVal" 10
-             , declareVarF "nokVal" 20
-             , ifElse (varF "sum" `eq` varF "target") [ret . Just $ varF "okVal"] [ret . Just $ varF "nokVal"]
-            ]
+ifVarBody :: Body ()
+ifVarBody = do
+    comment "Makes a if/else comparison on a moderately complex computation, involving variables"
+    comment "It sums a=145 + b=79 and compares equality with target=203."
+    comment "If equal, it returns okVal=10, otherwise nokVal=20"
+    comment "It should return 20"
+    declareVarF "a" 145
+    declareVarF "b" 79
+    declareVarF "target" 203
+    declareVarF "sum" (varF "a" + varF "b")
+    declareVarF "okVal" 10
+    declareVarF "nokVal" 20
+    ifElse (varF "sum" `eq` varF "target")
+        (ret $ varF "okVal")
+        (ret $ varF "nokVal")
 
 ifVarProg :: ZKProgram
-ifVarProg = mkSimpleProgram "If with vars" ifVarStmts
+ifVarProg = mkSimpleProgram "If with vars" ifVarBody
 
 -- * Simple program that compares two fixed numbers stored in variables and return the lowest
 
@@ -72,14 +76,16 @@ simpleInf = let n1 = 4238
 -}
 
 -- | EDSL version
-simpleInfStmts :: [Statement]
-simpleInfStmts = [ comment "if n1=4238 <= n2=21987 then n1 else n2."
-                 , comment "It should return 4238"
-                 , emptyLine
-                 , declareVarF "n1" 4238
-                 , declareVarF "n2" 21987
-                 , ifElse (varF "n1" `lte` varF "n2") [ret . Just $ varF "n1"] [ret . Just $ varF "n2"]
-                 ]
+simpleInfBody :: Body ()
+simpleInfBody = do
+    comment "if n1=4238 <= n2=21987 then n1 else n2."
+    comment "It should return 4238"
+    emptyLine
+    declareVarF "n1" 4238
+    declareVarF "n2" 21987
+    ifElse (varF "n1" `lte` varF "n2")
+        (ret $ varF "n1")
+        (ret $ varF "n2")
 
 simpleInfProg :: ZKProgram
-simpleInfProg = mkSimpleProgram "simple inf" simpleInfStmts
+simpleInfProg = mkSimpleProgram "simple inf" simpleInfBody
