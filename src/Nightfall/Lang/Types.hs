@@ -34,10 +34,6 @@ module Nightfall.Lang.Types ( Felt
                             , statements
                             -- , fcall
                             , nextSecret
-                            , declareVarF
-                            , declareVarB
-                            , assignVarF
-                            , assignVarB
                             , ifElse
                             , simpleIf
                             , while
@@ -45,12 +41,6 @@ module Nightfall.Lang.Types ( Felt
                             , ret
                             , comment
                             , emptyLine
-                            , incVarF
-                            , decVarF
-                            , updateVarF
-                            , withVarF
-                            , withVarF2
-                            , withVarF3
                             ) where
 
 import Nightfall.Lang.Internal.Types
@@ -132,7 +122,7 @@ add :: Expr Felt -> Expr Felt -> Expr Felt
 add  (Expr e1) (Expr e2) = Expr $ BinOp Add e1 e2
 
 sub :: Expr Felt -> Expr Felt -> Expr Felt
-sub (Expr e1) (Expr e2)= Expr $ BinOp Sub e1 e2
+sub (Expr e1) (Expr e2) = Expr $ BinOp Sub e1 e2
 
 mul :: Expr Felt -> Expr Felt -> Expr Felt
 mul (Expr e1) (Expr e2) = Expr $ BinOp Mul e1 e2
@@ -146,13 +136,13 @@ idiv32 (Expr e1) (Expr e2) = Expr $ BinOp IDiv32 e1 e2
 -- ** Boolean operations
 
 eq :: Expr Felt -> Expr Felt -> Expr Bool
-eq (Expr e1) (Expr e2)= Expr $ BinOp Equal e1 e2
+eq (Expr e1) (Expr e2) = Expr $ BinOp Equal e1 e2
 
 not' :: Expr Bool -> Expr Bool
 not' (Expr e) = Expr $ UnOp Not e
 
 lt :: Expr Felt -> Expr Felt -> Expr Bool
-lt (Expr e1) (Expr e2)= Expr $ BinOp Lower e1 e2
+lt (Expr e1) (Expr e2) = Expr $ BinOp Lower e1 e2
 
 lte :: Expr Felt -> Expr Felt -> Expr Bool
 lte (Expr e1) (Expr e2) = Expr $ BinOp LowerEq e1 e2
@@ -198,19 +188,6 @@ statements = traverse_ statement
 runBody :: Body () -> [Statement_]
 runBody body = runF (unBody body) (const []) $ \(BodyF stmt stmts) -> stmt : stmts
 
--- ** Variables
-declareVarF :: VarName -> Expr Felt -> Body ()
-declareVarF varname (Expr e) = statement $ DeclVariable varname e
-
-declareVarB :: VarName -> Expr Bool -> Body ()
-declareVarB varname (Expr e) = statement $ DeclVariable varname e
-
-assignVarF :: VarName -> Expr Felt -> Body ()
-assignVarF varname (Expr e) = statement $ AssignVar varname e
-
-assignVarB :: VarName -> Expr Bool -> Body ()
-assignVarB varname (Expr e) = statement $ AssignVar varname e
-
 ifElse :: Expr Bool -> Body () -> Body () -> Body ()
 ifElse (Expr cond) ifBlock elseBlock = statement $ IfElse cond (runBody ifBlock) (runBody elseBlock)
 
@@ -232,34 +209,3 @@ comment = statement . Comment
 
 emptyLine :: Body ()
 emptyLine = statement EmptyLine
-
--- ** A few helpers for common code patterns
-
--- | Apply a function of 1 argument over @var and store result in @targetVar
-withVarF :: VarName -> VarName -> (Expr Felt -> Expr Felt) -> Body ()
-withVarF var targetVar f = assignVarF targetVar $ f . varF $ var
-
--- | Apply a function of 2 arguments over two variables and store result in @targetVar
-withVarF2 :: (VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt) -> Body ()
-withVarF2 (var1, var2) targetVar f = assignVarF targetVar $ f (varF var1) (varF var2)
-
--- | Apply a function of 3 arguments over three variables and store result in @targetVar
-withVarF3 :: (VarName, VarName, VarName) -> VarName -> (Expr Felt -> Expr Felt -> Expr Felt -> Expr Felt) -> Body ()
-withVarF3 (var1, var2, var3) targetVar f = assignVarF targetVar $ f (varF var1) (varF var2) (varF var3)
-
--- | Shorthand to update a variable value with a computation (which might depend on its current value)
--- It's shorter and easier to write 'updateVarF "cnt" $ \n -> 3 * n + 1' than writing 'assignVarF "cnt" (varF "cnt" * 3 + 1)'
--- especially if we use the variable value several times
-updateVarF :: VarName -> (Expr Felt -> Expr Felt) -> Body ()
--- updateVarF varname f = assignVarF varname (f (varF varname))
-updateVarF varname = withVarF varname varname
-
--- | Shorthand to increment a variable (i += n)
--- It's shorter and easier to write 'incVarF "i" 1' than writing 'assignVarF "i" (varF "i" + 1)`
-incVarF :: VarName -> Felt -> Body ()
--- incVarF varname val = assignVarF varname (varF varname + (Expr . Lit $ val))
-incVarF varname val = updateVarF varname (`add` lit val)
-
--- | Same as above, but for decrementing
-decVarF :: VarName -> Felt -> Body ()
-decVarF varname val = updateVarF varname (`sub` lit val)

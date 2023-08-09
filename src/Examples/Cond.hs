@@ -1,9 +1,13 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Examples.Cond ( simpleIfProg
                      , ifVarProg
                      , simpleInfProg
                      ) where
 
 import Nightfall.Lang.Types
+import Nightfall.Lang.Syntax.DotRecord
 
 -- * Simple program that uses one if / else statement
 
@@ -22,8 +26,8 @@ simpleIfBody = do
     comment "if (4 == 8) then return 10 else return 20"
     comment "Should return 20"
     ifElse (eq 4 8)
-        (ret $ 10)
-        (ret $ 20)
+        (ret 10)
+        (ret 20)
 
 simpleIfProg :: ZKProgram
 simpleIfProg = mkSimpleProgram "simple if" simpleIfBody
@@ -51,15 +55,15 @@ ifVarBody = do
     comment "It sums a=145 + b=79 and compares equality with target=203."
     comment "If equal, it returns okVal=10, otherwise nokVal=20"
     comment "It should return 20"
-    declareVarF "a" 145
-    declareVarF "b" 79
-    declareVarF "target" 203
-    declareVarF "sum" (varF "a" + varF "b")
-    declareVarF "okVal" 10
-    declareVarF "nokVal" 20
-    ifElse (varF "sum" `eq` varF "target")
-        (ret $ varF "okVal")
-        (ret $ varF "nokVal")
+    Felt <- declare.a 145
+    Felt <- declare.b 79
+    Felt <- declare.target 203
+    Felt <- declare.sum $ get.a + get.b
+    Felt <- declare.okVal 10
+    Felt <- declare.nokVal 20
+    ifElse (get.sum `eq` get.target)
+        (ret get.okVal)
+        (ret get.nokVal)
 
 ifVarProg :: ZKProgram
 ifVarProg = mkSimpleProgram "If with vars" ifVarBody
@@ -81,11 +85,11 @@ simpleInfBody = do
     comment "if n1=4238 <= n2=21987 then n1 else n2."
     comment "It should return 4238"
     emptyLine
-    declareVarF "n1" 4238
-    declareVarF "n2" 21987
-    ifElse (varF "n1" `lte` varF "n2")
-        (ret $ varF "n1")
-        (ret $ varF "n2")
+    Felt <- declare.n1 4238
+    Felt <- declare.n2 21987
+    ifElse (get.n1 `lte` get.n2)
+        (ret get.n1)
+        (ret get.n2)
 
 simpleInfProg :: ZKProgram
 simpleInfProg = mkSimpleProgram "simple inf" simpleInfBody

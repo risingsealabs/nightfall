@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Examples.Simple ( trivial1Prog
                        , trivial2Prog
                        , trivial3Prog
@@ -8,6 +11,7 @@ module Examples.Simple ( trivial1Prog
                        ) where
 
 import Nightfall.Lang.Types
+import Nightfall.Lang.Syntax.DotRecord
 
 -- * Simplest, most trivial program that adds to fixed numbers, no variable, no inputs (public or secret)
 
@@ -110,8 +114,8 @@ simpleVar1Body = do
     comment "Simple addition, but with a variable storing a value"
     comment "a = 999"
     comment "a + 1. It should return 1000"
-    declareVarF "a" (lit 999)
-    ret $ add (varF "a") (lit 1)
+    Felt <- declare.a (lit 999)
+    ret $ add get.a (lit 1)
 
 simpleVar1Prog :: ZKProgram
 simpleVar1Prog = ZKProgram { pName = "simple var 1"
@@ -140,10 +144,10 @@ simpleVar2Body = do
     comment "a = 888, b = 222"
     comment "c = a - b. Return c"
     comment "It should return 666"
-    declareVarF "a" 888
-    declareVarF "b" 222
-    declareVarF "c" (varF "a" - varF "b")
-    ret $ varF "c"
+    Felt <- declare.a 888
+    Felt <- declare.b 222
+    Felt <- declare.c $ get.a - get.b
+    ret get.c
 
 simpleVar2Prog :: ZKProgram
 simpleVar2Prog = ZKProgram { pName = "simple var 2"
@@ -158,10 +162,10 @@ simpleVar3Body :: Body ()
 simpleVar3Body = do
     comment "Rewrite on the same variable several times"
     comment "a = 10, b = 20, a = 50, a + b. Should return 70"
-    declareVarF "a" 10
-    declareVarF "b" 20
-    assignVarF "a" 50
-    ret $ varF "a" + varF "b"
+    Felt <- declare.a 10
+    Felt <- declare.b 20
+    set.a 50
+    ret $ get.a + get.b
 
 simpleVar3Prog :: ZKProgram
 simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Body

@@ -1,7 +1,11 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Examples.Loops ( sumTo10Prog
                       ) where
 
 import Nightfall.Lang.Types
+import Nightfall.Lang.Syntax.DotRecord
 
 -- * Simple program that adds numbers from 1 to 10
 
@@ -19,12 +23,12 @@ sumTo10Stmts :: Body ()
 sumTo10Stmts = do
     comment "Simple programs that sums numbers from 0 to 10."
     comment "It should return 55"
-    declareVarF "n" 10
-    declareVarF "acc" 0
-    while (varF "n" `gt` 0) $ do
-        assignVarF "acc" (varF "acc" + varF "n")
-        assignVarF "n" (varF "n" - 1)
-    ret $ varF "acc"
+    Felt <- declare.n 10
+    Felt <- declare.acc 0
+    while (get.n `gt` 0) $ do
+        set.acc $ get.acc + get.n
+        set.n $ get.n - 1
+    ret get.acc
 
 sumTo10Prog :: ZKProgram
 sumTo10Prog = mkSimpleProgram "Sum to 10" sumTo10Stmts
