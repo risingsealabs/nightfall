@@ -1,7 +1,9 @@
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Nightfall.MASM.Integral where
 
@@ -15,7 +17,8 @@ import GHC.TypeNats
 -- | The type of indices into Miden's stack, each element is greater than or equal to @lower@ and
 -- less than or equal to @upper@.
 newtype StackIndex (lower :: Nat) (upper :: Nat) = StackIndex Word8
-    deriving (Eq, Ord, Show, Generic, Typeable)
+    deriving stock (Generic, Typeable)
+    deriving newtype (Eq, Ord, Show)
 
 -- | Convert a 'StackIndex' to the corresponding 'Integer'.
 unStackIndex :: StackIndex lower upper -> Integer
@@ -48,7 +51,8 @@ unsafeToStackIndex = coerce (fromInteger :: Integer -> Word8)
 
 -- | The type of indices in Miden's global memory (accessed via @mem_load@, @mem_store@ etc).
 newtype MemoryIndex = MemoryIndex Word32
-    deriving (Eq, Ord, Show, Generic, Typeable)
+    deriving stock (Generic, Typeable)
+    deriving newtype (Eq, Ord, Show)
 
 -- | Convert a 'MemoryIndex' to the corresponding 'Integer'.
 unMemoryIndex :: MemoryIndex -> Integer
