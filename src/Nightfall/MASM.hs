@@ -15,7 +15,6 @@ import Data.Text.Lazy (Text, pack, unpack)
 
 import Nightfall.MASM.Callgraph
 import Nightfall.MASM.Types
-import Nightfall.MASM.Integral (unMemoryIndex, unStackIndex)
 import Nightfall.Lang.Internal.Felt (unFelt)
 
 comment :: Show a => a -> Instruction
