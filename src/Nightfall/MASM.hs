@@ -15,6 +15,7 @@ import Data.Text.Lazy (Text, pack, unpack)
 
 import Nightfall.MASM.Callgraph
 import Nightfall.MASM.Types
+import Nightfall.Lang.Internal.Felt (unFelt)
 
 comment :: Show a => a -> Instruction
 comment = Comment . pack . show
@@ -63,23 +64,23 @@ ppInstr (While body) = do
   indent $ traverse_ ppInstr body
   "end"
 
-ppInstr (LocStore n) = [ "loc_store." ++ show n ]
-ppInstr (LocLoad n) = [ "loc_load." ++ show n ]
+ppInstr (LocStore n) = [ "loc_store." ++ show (unMemoryIndex n) ]
+ppInstr (LocLoad n) = [ "loc_load." ++ show (unMemoryIndex n) ]
 
-ppInstr (AdvPush n) = [ "adv_push." ++ show n ]
-ppInstr (Push n) = [ "push." ++ show n ]
-ppInstr (Swap n) = [ "swap" ++ if unStackIndex n == 1 then "" else "." ++ show n ]
+ppInstr (AdvPush n) = [ "adv_push." ++ show (unStackIndex n) ]
+ppInstr (Push n) = [ "push." ++ show (unFelt n) ]
+ppInstr (Swap n) = [ "swap" ++ if unStackIndex n == 1 then "" else "." ++ show (unStackIndex n) ]
 ppInstr Drop = "drop"
 ppInstr CDrop = "cdrop"
-ppInstr (Dup n) = [ "dup." ++ show n ]
-ppInstr (MoveUp n) = [ "movup." ++ show n ]
-ppInstr (MoveDown n) = [ "movdn." ++ show n ]
+ppInstr (Dup n) = [ "dup." ++ show (unStackIndex n) ]
+ppInstr (MoveUp n) = [ "movup." ++ show (unStackIndex n) ]
+ppInstr (MoveDown n) = [ "movdn." ++ show (unStackIndex n) ]
 ppInstr TruncateStack = "exec.sys::truncate_stack"
 ppInstr SDepth = "sdepth"
 ppInstr (Eq Nothing) = "eq"
-ppInstr (Eq (Just n)) = [ "eq." ++ show n ]
+ppInstr (Eq (Just n)) = [ "eq." ++ show (unFelt n) ]
 ppInstr (NEq Nothing) = "neq"
-ppInstr (NEq (Just n)) = [ "neq." ++ show n ]
+ppInstr (NEq (Just n)) = [ "neq." ++ show (unFelt n) ]
 ppInstr Not = "not"
 ppInstr Lt = "lt"
 ppInstr Lte = "lte"
@@ -87,13 +88,13 @@ ppInstr Gt = "gt"
 ppInstr Gte = "gte"
 ppInstr IsOdd = "is_odd"
 ppInstr (Add Nothing) = "add"
-ppInstr (Add (Just n)) = [ "add." ++ show n ]
+ppInstr (Add (Just n)) = [ "add." ++ show (unFelt n) ]
 ppInstr (Sub Nothing) = "sub"
-ppInstr (Sub (Just n)) = [ "sub." ++ show n ]
+ppInstr (Sub (Just n)) = [ "sub." ++ show (unFelt n) ]
 ppInstr (Mul Nothing) = "mul"
-ppInstr (Mul (Just n)) = [ "mul." ++ show n ]
+ppInstr (Mul (Just n)) = [ "mul." ++ show (unFelt n) ]
 ppInstr (Div Nothing) = "div"
-ppInstr (Div (Just n)) = [ "div." ++ show n ]
+ppInstr (Div (Just n)) = [ "div." ++ show (unFelt n) ]
 
 ppInstr Neg = "neg"
 ppInstr IAdd = "u32wrapping_add"
@@ -118,8 +119,8 @@ ppInstr IRotl = "u32checked_rotl"
 ppInstr IRotr = "u32checked_rotr"
 ppInstr IPopcnt = "u32checked_popcnt"
 
-ppInstr (MemLoad mi) = [ "mem_load" ++ maybe "" (\i -> "." ++ show i) mi ]
-ppInstr (MemStore mi) = [ "mem_store" ++ maybe "" (\i -> "." ++ show i) mi ]
+ppInstr (MemLoad mi) = [ "mem_load" ++ maybe "" (\i -> "." ++ show (unMemoryIndex i)) mi ]
+ppInstr (MemStore mi) = [ "mem_store" ++ maybe "" (\i -> "." ++ show (unMemoryIndex i)) mi ]
 ppInstr IAdd64 = "exec.u64::wrapping_add"
 ppInstr ISub64 = "exec.u64::wrapping_sub"
 ppInstr IMul64 = "exec.u64::wrapping_mul"
