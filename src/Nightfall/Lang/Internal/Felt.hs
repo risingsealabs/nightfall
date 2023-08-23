@@ -92,8 +92,13 @@ We use @Mod FeltOrder@ as the underlying representation of 'Felt'. Here is why n
 --
 -- > forall (i :: Felt). 0 <= i && i < feltOrder
 newtype Felt = Felt (Mod FeltOrder)
-    deriving stock (Generic)
-    deriving newtype (Eq, Ord, Show, Num, Fractional, Typeable)
+    deriving stock (Generic, Typeable)
+    deriving newtype (Eq, Ord, Num, Fractional)
+
+-- Implementing manually, because 'Show' for 'Mod' renders the order of the field, which is only
+-- extra noise for us.
+instance Show Felt where
+    showsPrec pr = showsPrec pr . unFelt
 
 -- | Convert a 'Felt' to the corresponding 'Integer'.
 unFelt :: Felt -> Integer

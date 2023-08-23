@@ -85,4 +85,8 @@ test-suite nightfall-test
     main-is:          Main.hs
     build-depends:
         base >=4.16 && <5,
-        nightfall
+        nightfall,
+        mtl,
+        filepath,
+        tasty,
+        tasty-golden

@@ -29,7 +29,7 @@ main = do
                                 , ("collatzPriv", collatzPrivProg)
                                 , ("simpleSecret", simpleSecretProg)
                                 ]
-    
+
     args <- getArgs
 
     -- For now, trivial: argument is the name of the example to run
@@ -38,7 +38,7 @@ main = do
         let str = "Usage: " ++ progName ++ " <example> [filepath] where <example> is one of:\n"
             examples = unlines . Prelude.map ("    "++) . Map.keys $ allProgs
         error $ str ++ examples ++ "\n and [filepath] (optional) is path to write the MASM, otherwise stdout"
-    
+
     (masm, ctx) <- case Map.lookup (head args) allProgs of
         Nothing -> do
             let str = "Example program \"" ++ head args ++ "\" not found. Available ones are:\n"
@@ -60,5 +60,5 @@ main = do
             putStrLn $ "Miden program written in \"" ++ fp ++ "\""
         else do
             putStrLn . ppMASM $ masm
-    
+
     io

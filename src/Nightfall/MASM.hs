@@ -24,7 +24,7 @@ accessibleStackDepth :: Int
 accessibleStackDepth = 16
 
 indent :: PpMASM a -> PpMASM a
-indent = censor (fmap ("  "++))
+indent = censor . fmap $ \s -> if null s then "" else "  " ++ s
 
 ppMASM :: Module -> String
 ppMASM = unlines . toList . execWriter . runPpMASM . ppModule
