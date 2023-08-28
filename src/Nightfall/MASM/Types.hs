@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -25,9 +24,9 @@ import Nightfall.Lang.Types
 
 import Control.Monad.Writer.Strict
 import qualified Data.DList as DList
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import Data.String
-import Data.Text.Lazy (Text)
+import Data.Text (Text)
 import Data.Typeable
 import Data.Word (Word32)
 import qualified GHC.Exts
@@ -35,13 +34,16 @@ import GHC.Generics
 
 type ProcName = Text
 
+type AdvOpName = Text
+
 type ModName = Text
 
 data Module = Module
   { moduleImports :: [ModName],
     moduleProcs :: Map ProcName Proc,
     moduleProg :: Program,
-    moduleSecretInputs :: Either [Felt] FilePath
+    -- Please keep in sync with 'ZKProgram'.
+    moduleSecretInputs :: Either SecretInputs FilePath
   }
   deriving (Eq, Ord, Show, Generic, Typeable)
 
@@ -56,6 +58,7 @@ newtype Program = Program {programInstrs :: [Instruction]}
 
 data Instruction
   = Exec ProcName -- exec.foo
+  | Adv AdvOpName -- adv.foo
   | If
       { -- if.true
         thenBranch :: [Instruction],
@@ -63,7 +66,7 @@ data Instruction
       }
   | While [Instruction] -- while.true
   | AdvPush (StackIndex 1 16)  -- adv_push.n
-  | Push Felt -- push.n
+  | Push [Felt] -- push.a.b.c
   | Swap (StackIndex 1 15) -- swap[.i]
   | Drop -- drop
   | CDrop -- cdrop
@@ -142,7 +145,7 @@ newtype PpMASM a = PpMASM {runPpMASM :: Writer (DList.DList String) a}
 deriving instance MonadWriter (DList.DList String) PpMASM
 
 instance (a ~ ()) => IsString (PpMASM a) where
-  fromString s = tell [s]
+  fromString s = tell $ pure s
 
 instance (a ~ ()) => GHC.Exts.IsList (PpMASM a) where
   type Item (PpMASM a) = String

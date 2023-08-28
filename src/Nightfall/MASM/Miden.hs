@@ -3,8 +3,12 @@ module Nightfall.MASM.Miden where
 import Nightfall.Lang.Types
 import Nightfall.MASM
 import Nightfall.MASM.Types
+import Nightfall.Lang.Internal.Types
 
+import Control.Monad
 import Data.List
+import qualified Data.Map.Strict as Map
+import Data.Maybe
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -12,8 +16,6 @@ import System.IO
 import System.IO.Temp
 import System.Process
 import Text.Read
-import Data.Maybe
-import Control.Monad
 
 data KeepFile = Keep FilePath | DontKeep
   deriving Show
@@ -23,25 +25,44 @@ whenKeep k f = case k of
   DontKeep -> return Nothing
   Keep fp  -> Just <$> f fp
 
+-- TODO: use @prettyprinter@?
+displaySecretInputs :: SecretInputs -> String
+displaySecretInputs (SecretInputs advStack advMap) = unlines $ concat
+    [ -- TODO: wire the public inputs in properly.
+      [ "{ \"operand_stack\": []"
+      ]
+    , [ ", \"advice_stack\": " ++ show (map show advStack)
+      | not $ null advStack
+      ]
+    , if Map.null advMap
+        then []
+        else concat
+            [ [", \"advice_map\":"]
+            , zipWith
+                (\fmt strKV -> replicate 4 ' ' ++ fmt ++ " " ++ strKV)
+                ("{" : repeat ",")
+                (map (uncurry displayKV) $ Map.toList advMap)
+            , ["    }"]
+            ]
+    , [ "}"
+      ]
+    ]
+  where
+    displayKV hash wrds = show hash ++ ": " ++ show (concatMap midenWordToList wrds)
+
 runMiden :: KeepFile -> Module -> IO (Either String [Felt])
 runMiden keep m =
-    -- TODO: make this thread-safe using @concurrent-supply@ or something.
     withSystemTempFile "nightfall-testfile-XXX.masm" $ \masmPath masmHandle ->
     withSystemTempFile "nightfall-testfile-XXX.inputs" $ \inputsPath inputsHandle -> do
         hPutStrLn masmHandle $ ppMASM m
         hClose masmHandle
+        -- TODO: implement the file keeping logic for the inputs file too?
         _ <- whenKeep keep $ \masmSavePath -> copyFile masmPath masmSavePath
         args <- do
             let inputsFileOrList = moduleSecretInputs m
             inputsIfAny <- case inputsFileOrList of
-                Left [] -> pure []
-                Left inputs -> do
-                    hPutStrLn inputsHandle $ unlines
-                        [ "{"
-                        , "    \"operand_stack\": [],"
-                        , "    \"advice_stack\": " ++ show (map show inputs)
-                        , "}"
-                        ]
+                Left secretInputs -> do
+                    hPutStrLn inputsHandle $ displaySecretInputs secretInputs
                     hClose inputsHandle
                     pure ["--input", inputsPath]
                 Right inputsOrigPath -> do
