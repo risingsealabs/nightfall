@@ -1,7 +1,6 @@
 module Nightfall.MASM.Miden where
 
 import Data.List
-import Data.Word
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -10,6 +9,7 @@ import System.IO.Temp
 import System.Process
 import Text.Read
 
+import Nightfall.Lang.Types
 import Nightfall.MASM
 import Nightfall.MASM.Types
 
@@ -21,18 +21,24 @@ whenKeep k f = case k of
   DontKeep -> return Nothing
   Keep fp  -> Just <$> f fp
 
-runMiden :: KeepFile -> Module -> IO (Either String [Word32])
+runMiden :: KeepFile -> Module -> IO (Either String [Felt])
 runMiden keep m = withSystemTempFile "nightfall-testfile-XXX.masm" $ \fp hndl -> do
     hPutStrLn hndl (ppMASM m)
     hClose hndl
     _ <- whenKeep keep $ \masmModSaveFp -> copyFile fp masmModSaveFp
-    (ex, midenout, midenerr) <- readProcessWithExitCode "miden" ["run", "--assembly", fp] ""
+    let args = concat
+            [ ["--assembly", fp]
+            , case moduleSecretInputs m of
+                  Nothing         -> []
+                  Just inputsFile -> ["--input", inputsFile]
+            ]
+    (ex, midenout, midenerr) <- readProcessWithExitCode "miden" ("run" : args) ""
     case ex of
         ExitSuccess -> do
             let xs = filter ("Output: " `isPrefixOf`) (lines midenout)
             case xs of
                 [outline] -> do
-                  let mstack = (readMaybe :: String -> Maybe [Word32]) (drop 8 outline)
+                  let mstack = readMaybe (drop 8 outline)
                   case mstack of
                     Nothing -> return (Left "couldn't decode stack")
                     Just stack -> return (Right stack)

@@ -6,9 +6,10 @@ import Examples.Loops
 import Examples.Inputs
 import Examples.Cond
 
-import Nightfall.MASM
-import Nightfall.Targets.Miden
 import Nightfall.Lang.Types
+import Nightfall.MASM
+import Nightfall.MASM.Miden
+import Nightfall.Targets.Miden
 
 import Data.Char
 import Data.String
@@ -46,7 +47,12 @@ test_examplesGolden =
             (masm, _) = runState (transpile prog) context
             name = filter (not . isSpace) $ pName prog
             path = "test" </> "golden" </> name
-        in goldenVsString name path . pure . fromString $ ppMASM masm
+        in testGroup name $
+            [ goldenVsString "program" (path ++ ".masm") $
+                pure . fromString $ ppMASM masm
+            , goldenVsString "result" (path ++ ".mres") $
+                fromString . either id show <$> runMiden DontKeep masm
+            ]
 
 main :: IO ()
 main = defaultMain test_examplesGolden

@@ -19,4 +19,4 @@ simpleSecretStmts = do
     ret $ 10 * nextSecret
 
 simpleSecretProg :: ZKProgram
-simpleSecretProg = mkZKProgram "simple secret" simpleSecretStmts [] "simple_secrets.inputs"
+simpleSecretProg = mkZKProgram "simple secret" simpleSecretStmts [] "src/Examples/simple_secrets.inputs"
