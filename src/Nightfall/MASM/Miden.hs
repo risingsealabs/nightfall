@@ -1,5 +1,9 @@
 module Nightfall.MASM.Miden where
 
+import Nightfall.Lang.Types
+import Nightfall.MASM
+import Nightfall.MASM.Types
+
 import Data.List
 import System.Directory
 import System.Exit
@@ -8,10 +12,8 @@ import System.IO
 import System.IO.Temp
 import System.Process
 import Text.Read
-
-import Nightfall.Lang.Types
-import Nightfall.MASM
-import Nightfall.MASM.Types
+import Data.Maybe
+import Control.Monad
 
 data KeepFile = Keep FilePath | DontKeep
   deriving Show
@@ -22,37 +24,55 @@ whenKeep k f = case k of
   Keep fp  -> Just <$> f fp
 
 runMiden :: KeepFile -> Module -> IO (Either String [Felt])
-runMiden keep m = withSystemTempFile "nightfall-testfile-XXX.masm" $ \fp hndl -> do
-    hPutStrLn hndl (ppMASM m)
-    hClose hndl
-    _ <- whenKeep keep $ \masmModSaveFp -> copyFile fp masmModSaveFp
-    let args = concat
-            [ ["--assembly", fp]
-            , case moduleSecretInputs m of
-                  Nothing         -> []
-                  Just inputsFile -> ["--input", inputsFile]
-            ]
-    (ex, midenout, midenerr) <- readProcessWithExitCode "miden" ("run" : args) ""
-    case ex of
-        ExitSuccess -> do
-            let xs = filter ("Output: " `isPrefixOf`) (lines midenout)
-            case xs of
-                [outline] -> do
-                  let mstack = readMaybe (drop 8 outline)
-                  case mstack of
-                    Nothing -> return (Left "couldn't decode stack")
-                    Just stack -> return (Right stack)
-                _ -> return (Left $ "unexpected miden run output: " ++ show (xs, midenout, midenerr))
-        ExitFailure e -> return (Left $ "miden run failed: " ++ show (e, midenout, midenerr))
+runMiden keep m =
+    -- TODO: make this thread-safe using @concurrent-supply@ or something.
+    withSystemTempFile "nightfall-testfile-XXX.masm" $ \masmPath masmHandle ->
+    withSystemTempFile "nightfall-testfile-XXX.inputs" $ \inputsPath inputsHandle -> do
+        hPutStrLn masmHandle $ ppMASM m
+        hClose masmHandle
+        _ <- whenKeep keep $ \masmSavePath -> copyFile masmPath masmSavePath
+        args <- do
+            let inputsFileOrList = moduleSecretInputs m
+            inputsIfAny <- case inputsFileOrList of
+                Left [] -> pure []
+                Left inputs -> do
+                    hPutStrLn inputsHandle $ unlines
+                        [ "{"
+                        , "    \"operand_stack\": [],"
+                        , "    \"advice_stack\": " ++ show (map show inputs)
+                        , "}"
+                        ]
+                    hClose inputsHandle
+                    pure ["--input", inputsPath]
+                Right inputsOrigPath -> do
+                    copyFile inputsOrigPath inputsPath
+                    pure ["--input", inputsPath]
+            pure $ ["--assembly", masmPath] ++ inputsIfAny
+        (ex, midenout, midenerr) <- readProcessWithExitCode "miden" ("run" : args) ""
+        case ex of
+            ExitSuccess -> do
+                case mapMaybe (stripPrefix "Output: " >=> readMaybe) $ lines midenout of
+                    [stack] -> return $ Right stack
+                    _ -> return . Left . concat $ concat
+                        [ [ "Unexpected miden run output." ]
+                        , [ "\n\nstdout:\n" ++ midenout | not $ null midenout]
+                        , [ "\n\nstderr:\n" ++ midenerr | not $ null midenerr]
+                        ]
+            ExitFailure e -> return . Left . concat $ concat
+                 [ [ "Miden run failed." ]
+                 , [ "\nThe error code was " ++ show e ]
+                 , [ "\n\nstdout:\n" ++ midenout | not $ null midenout]
+                 , [ "\n\nstderr:\n" ++ midenerr | not $ null midenerr]
+                 ]
 
 runMidenProve :: Module -> IO (FilePath, FilePath, String)
 runMidenProve m = do
-    fp <- writeSystemTempFile "nightfall-testfile-XXX.masm" (ppMASM m)
-    let outFile = fp <.> "out"
-        proofFile = fp <.> "proof"
+    masmPath <- writeSystemTempFile "nightfall-testfile-XXX.masm" (ppMASM m)
+    let outFile = masmPath <.> "out"
+        proofFile = masmPath <.> "proof"
     (ex, midenout, midenerr) <-
       readProcessWithExitCode "miden"
-        ["prove", "--assembly", fp, "-o", outFile, "-p", proofFile] ""
+        ["prove", "--assembly", masmPath, "-o", outFile, "-p", proofFile] ""
     -- putStrLn midenout
     -- putStrLn midenerr
     case ex of
