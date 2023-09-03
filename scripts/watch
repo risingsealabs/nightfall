@@ -1,0 +1,19 @@
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+ACTIVE_TARGET="$1"
+shift
+
+OTHER_TARGETS="$1"
+shift
+
+if [ ! -z "$1" ]
+then TEST="--test=$1"
+fi
+shift
+
+# Currently only supports a single package for auto-restarting
+PKGS="$(find | grep '.cabal$')"
+PKG=${PKGS[0]}
+REPL="$DIR/repl $ACTIVE_TARGET $OTHER_TARGETS"
+
+ghcid -c $REPL --warnings --restart="$PKG" "$TEST" "$@"

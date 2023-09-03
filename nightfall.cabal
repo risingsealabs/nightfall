@@ -16,8 +16,9 @@ common warnings
     ghc-options: -Wall
 
 common dev-flags
-    if impl(ghc >= 9.6)
-        ghc-options: -fwrite-if-simplified-core
+--  Somehow causes panic crashes on subsequent launches when running test suite inside multi-repl
+--    if impl(ghc >= 9.6)
+--        ghc-options: -fwrite-if-simplified-core
 
 library
     import:           warnings
@@ -67,7 +68,7 @@ executable nightfall
       , nightfall
       , mtl
       , containers
-    
+
     --ghc-options:
 
     hs-source-dirs:   app
