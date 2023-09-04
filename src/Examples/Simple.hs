@@ -27,7 +27,7 @@ trivial1Prog :: ZKProgram
 trivial1Prog = ZKProgram { pName = "trivial 1"
                           , pBody = trivial1Body
                           , pPublicInputs = []
-                          , pSecretInputs = []
+                          , pSecretInputs = Left []
                           }
 
 -- * Almost as simple a program, we just have one nested level
@@ -48,7 +48,7 @@ trivial2Prog :: ZKProgram
 trivial2Prog = ZKProgram { pName = "trivial 2"
                           , pBody = trivial2Body
                           , pPublicInputs = []
-                          , pSecretInputs = []
+                          , pSecretInputs = Left []
                           }
 
 
@@ -70,7 +70,7 @@ trivial3Prog :: ZKProgram
 trivial3Prog = ZKProgram { pName = "trivial 3"
                           , pBody = trivial3Body
                           , pPublicInputs = []
-                          , pSecretInputs = []
+                          , pSecretInputs = Left []
                           }
 
 -- * Another simple program that uses the Num instance t omake it easier to write and make sure it works
@@ -91,7 +91,7 @@ trivial4Prog :: ZKProgram
 trivial4Prog = ZKProgram { pName = "trivial 4"
                           , pBody = trivial4Body
                           , pPublicInputs = []
-                          , pSecretInputs = []
+                          , pSecretInputs = Left []
                           }
 
 -- * Simple program using a variable to store a value
@@ -117,7 +117,7 @@ simpleVar1Prog :: ZKProgram
 simpleVar1Prog = ZKProgram { pName = "simple var 1"
                           , pBody = simpleVar1Body
                           , pPublicInputs = []
-                          , pSecretInputs = []
+                          , pSecretInputs = Left []
                           }
 
 
@@ -149,7 +149,7 @@ simpleVar2Prog :: ZKProgram
 simpleVar2Prog = ZKProgram { pName = "simple var 2"
                           , pBody = simpleVar2Body
                           , pPublicInputs = []
-                          , pSecretInputs = []
+                          , pSecretInputs = Left []
                           }
 
 -- * Simple program that overwrite the values of a variable several times

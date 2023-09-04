@@ -72,6 +72,7 @@ transpile zkProg = do
     return $ Module { moduleImports = [] -- No import for now (TODO)
                     , moduleProcs = Map.empty -- No procs either (TODO)
                     , moduleProg = Program (warning ++ midenInstr)
+                    , moduleSecretInputs = pSecretInputs zkProg
                     }
 
 transpileStatement :: Statement_ -> State Context [Instruction]

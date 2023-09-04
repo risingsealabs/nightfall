@@ -7,6 +7,7 @@
 
 module Nightfall.Lang.Internal.Felt where
 
+import Data.Bifunctor
 import Data.Coerce
 import GHC.Generics
 import Data.Typeable
@@ -99,6 +100,9 @@ newtype Felt = Felt (Mod FeltOrder)
 -- extra noise for us.
 instance Show Felt where
     showsPrec pr = showsPrec pr . unFelt
+
+instance Read Felt where
+    readsPrec pr = map (first fromInteger) . readsPrec pr
 
 -- | Convert a 'Felt' to the corresponding 'Integer'.
 unFelt :: Felt -> Integer

@@ -40,7 +40,8 @@ type ModName = Text
 data Module = Module
   { moduleImports :: [ModName],
     moduleProcs :: Map ProcName Proc,
-    moduleProg :: Program
+    moduleProg :: Program,
+    moduleSecretInputs :: Either [Felt] FilePath
   }
   deriving (Eq, Ord, Show, Generic, Typeable)
 

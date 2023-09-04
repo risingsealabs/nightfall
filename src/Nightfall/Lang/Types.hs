@@ -87,28 +87,32 @@ newtype Body a = Body
     } deriving newtype (Functor, Applicative, Monad)
 
 data ZKProgram = ZKProgram
-    { pName :: String            -- ^ Program name, is this needed?
-    , pBody :: Body ()              -- ^ List of statements comprising the program
-    , pPublicInputs :: [Felt]    -- ^ Defining the public inputs as a list of field elements for now
-    , pSecretInputs :: FilePath  -- ^ For now, for simplicty, we'll be referring to a '.inputs' file
+    { pName :: String
+      -- ^ Program name, useful for tests.
+    , pBody :: Body ()
+      -- ^ List of statements comprising the program
+    , pPublicInputs :: [Felt]
+      -- ^ Defining the public inputs as a list of field elements for now
+    , pSecretInputs :: Either [Felt] FilePath
+      -- ^ Either a list with private inputs or an inputs file path.
     }
 
--- | Helper to quickly make a simple @ZKProgram from a list of statements, no inputs
+-- | Helper to quickly make a simple @ZKProgram@ from a list of statements, no inputs
 mkSimpleProgram :: String -> Body () -> ZKProgram
 mkSimpleProgram name body = ZKProgram
     { pName = name
     , pBody = body
     , pPublicInputs = []
-    , pSecretInputs = ""
+    , pSecretInputs = Left []
     }
 
--- | Helper to build a @ZKPeogram
+-- | Helper to build a @ZKProgram@.
 mkZKProgram :: String -> Body () -> [Felt] -> FilePath -> ZKProgram
 mkZKProgram name body pubs secretFP = ZKProgram
     { pName = name
     , pBody = body
     , pPublicInputs = pubs
-    , pSecretInputs = secretFP
+    , pSecretInputs = Right secretFP
     }
 
 -- * "Smart Constructors" for building (type-safe) @Expr. They are the ones exposed for users to use instead of constructing the

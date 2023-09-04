@@ -67,4 +67,4 @@ collatzPrivStmts = do
     ret $ varF "length"
 
 collatzPrivProg :: ZKProgram
-collatzPrivProg = mkZKProgram "collatz private" collatzPrivStmts [] "collatz_priv_secrets.input"
+collatzPrivProg = mkZKProgram "collatz private" collatzPrivStmts [] "src/Examples/collatz_secrets.inputs"
