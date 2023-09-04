@@ -1,0 +1,10 @@
+# https://github.com/haskell/cabal/issues/9195
+# Workaround as needed via explicit target list
+ACTIVE_TARGET=$1
+OTHER_TARGETS=$2
+
+# Somewhat fragile stringly test, but only needs to hold for a few versions until we stop supporting < 9.6
+if [ ! "$(ghc --version)" \< "The Glorious Glasgow Haskell Compilation System, version 9.6" ]
+then cabal repl --enable-multi-repl $ACTIVE_TARGET $OTHER_TARGETS
+else cabal repl $ACTIVE_TARGET
+fi
