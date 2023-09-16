@@ -33,6 +33,7 @@ library
                       Nightfall.Lang.Internal.Felt
                       Nightfall.Lang.Internal.Types
                       Nightfall.Lang.Types
+                      Nightfall.Lang.Syntax.Default
                       Nightfall.Lang.Syntax.DotRecord
                       Nightfall.MASM
                       Nightfall.MASM.Callgraph

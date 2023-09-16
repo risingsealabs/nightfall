@@ -7,7 +7,7 @@ module Examples.Cond ( simpleIfProg
                      ) where
 
 import Nightfall.Lang.Types
-import Nightfall.Lang.Syntax.DotRecord
+import Nightfall.Lang.Syntax.Default
 
 -- * Simple program that uses one if / else statement
 
@@ -55,15 +55,15 @@ ifVarBody = do
     comment "It sums a=145 + b=79 and compares equality with target=203."
     comment "If equal, it returns okVal=10, otherwise nokVal=20"
     comment "It should return 20"
-    Felt <- declare.a 145
-    Felt <- declare.b 79
-    Felt <- declare.target 203
-    Felt <- declare.sum $ get.a + get.b
-    Felt <- declare.okVal 10
-    Felt <- declare.nokVal 20
-    ifElse (get.sum `eq` get.target)
-        (ret get.okVal)
-        (ret get.nokVal)
+    a <- declare "a" 145
+    b <- declare "b" 79
+    target <- declare "target" 203
+    s <- declare "s" $ get a + get b
+    okVal <- declare "okVal" 10
+    nokVal <- declare "nokVal" 20
+    ifElse (get s `eq` get target)
+        (ret $ get okVal)
+        (ret $ get nokVal)
 
 ifVarProg :: ZKProgram
 ifVarProg = mkSimpleProgram "If with vars" ifVarBody
@@ -85,11 +85,11 @@ simpleInfBody = do
     comment "if n1=4238 <= n2=21987 then n1 else n2."
     comment "It should return 4238"
     emptyLine
-    Felt <- declare.n1 4238
-    Felt <- declare.n2 21987
-    ifElse (get.n1 `lte` get.n2)
-        (ret get.n1)
-        (ret get.n2)
+    n1 <- declare "n1" 4238
+    n2 <- declare "n2" 21987
+    ifElse (get n1 `lte` get n2)
+        (ret $ get n1)
+        (ret $ get n2)
 
 simpleInfProg :: ZKProgram
 simpleInfProg = mkSimpleProgram "simple inf" simpleInfBody
