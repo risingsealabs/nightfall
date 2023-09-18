@@ -9,6 +9,7 @@ import Control.Monad
 import Data.List
 import qualified Data.Map.Strict as Map
 import Data.Maybe
+import Data.Word
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -50,15 +51,17 @@ displaySecretInputs (SecretInputs advStack advMap) = unlines $ concat
   where
     displayKV hash wrds = show hash ++ ": " ++ show (concatMap midenWordToList wrds)
 
-runMiden :: KeepFile -> Module -> IO (Either String [Felt])
-runMiden keep m =
+runMiden :: KeepFile -> Maybe Word32 -> Module -> IO (Either String [Felt])
+runMiden keep mayNumOutputs m =
     withSystemTempFile "nightfall-testfile-XXX.masm" $ \masmPath masmHandle ->
     withSystemTempFile "nightfall-testfile-XXX.inputs" $ \inputsPath inputsHandle -> do
         hPutStrLn masmHandle $ ppMASM m
         hClose masmHandle
         -- TODO: implement the file keeping logic for the inputs file too?
         _ <- whenKeep keep $ \masmSavePath -> copyFile masmPath masmSavePath
-        args <- do
+        let numOutputsPrefix =
+                maybe [] (\numOutputs -> ["--num-outputs", show numOutputs]) mayNumOutputs
+        args <- mappend numOutputsPrefix <$> do
             let inputsFileOrList = moduleSecretInputs m
             inputsIfAny <- case inputsFileOrList of
                 Left secretInputs -> do

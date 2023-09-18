@@ -87,13 +87,13 @@ test_examplesGolden =
                     ppMASM masm
             , goldenVsStringColored "result" (path ++ ".mres") $
                 fromString . either id show <$>
-                    runMiden DontKeep masm
+                    runMiden DontKeep Nothing masm
             ] ++
             -- Just to test that 'runMiden' correctly handles secret inputs provided via a list of
             -- 'Felt's directly, not just via an inputs file.
             [ goldenVsStringColored "result via list" (path ++ ".mres") $
                 fromString . either id show <$>
-                    runMiden DontKeep (replaceSecretInputsFileWithItsContents masm)
+                    runMiden DontKeep Nothing (replaceSecretInputsFileWithItsContents masm)
             | Right _ <- [moduleSecretInputs masm]
             ]
 

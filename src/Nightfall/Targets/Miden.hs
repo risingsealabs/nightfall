@@ -6,6 +6,7 @@ module Nightfall.Targets.Miden ( Context(..)
                                , defaultContext
                                , Config(..)
                                , defaultConfig
+                               , toHashModule
                                , transpile
                                ) where
 
@@ -24,7 +25,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as SText
 import qualified Data.Text as Strict (Text)
-import GHC.Natural
+import Data.Word
 import System.IO.Unsafe
 
 -- | Applicatively fold a 'Foldable'.
@@ -71,30 +72,35 @@ defaultContext = Context
     , config = defaultConfig
     }
 
+toHashModule :: Word32 -> [MidenWord] -> Module
+toHashModule numWords midenWords =
+      Module
+          ["std::mem"]  -- @std::mem@ provides @mem::pipe_words_to_memory@ used above.
+          Map.empty
+          (Program instrs)
+          (Left $ SecretInputs (midenWords >>= midenWordToList) Map.empty)
+  where
+      instrs =
+          [ Push [0, fromIntegral numWords]
+            -- Stack: [numWords, 0, <zeros>]
+          , Exec "mem::pipe_words_to_memory"
+            -- Stack: [Hash, memPos', <zeros>]
+          ]
+
+
 -- | Compute the hash of the padded inputs by invoking the Miden executable with the inputs put on
 -- @advice_stack@ and subsequently loaded into memory via @exec.mem::pipe_words_to_memory@,
 -- which results in the top word on the stack being the hash in reversed form (so we
 -- additionally reverse it to get the actual hash).
-getHash :: Natural -> [MidenWord] -> Either String [Felt]
+getHash :: Word32 -> [MidenWord] -> Either String [Felt]
 getHash numWords midenWords =
     -- TODO: should transpilation work in IO instead or can we treat 'runMiden' as "morally-pure"?
-    fmap (reverse . take 4) . unsafePerformIO . runMiden DontKeep $
-        let instrs =
-                [ Push [0, fromIntegral numWords]
-                  -- Stack: [numWords, 0, <zeros>]
-                , Exec "mem::pipe_words_to_memory"
-                  -- Stack: [Hash, memPos', <zeros>]
-                ]
-        in Module
-            ["std::mem"]  -- @std::mem@ provides @mem::pipe_words_to_memory@ used above.
-            Map.empty
-            (Program instrs)
-            (Left $ SecretInputs (midenWords >>= midenWordToList) Map.empty)
+    fmap reverse . unsafePerformIO $ runMiden DontKeep (Just 4) $ toHashModule numWords midenWords
 
 -- | Allocate memory for a variable.
 alloc
     :: VarName
-    -> Natural  -- ^ How many Miden words to allocate.
+    -> Word32  -- ^ How many Miden words to allocate.
     -> State Context MemoryIndex
 alloc var numWords = do
     varPos <- gets memPos

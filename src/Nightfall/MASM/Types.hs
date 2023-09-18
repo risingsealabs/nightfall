@@ -54,7 +54,7 @@ data Proc = Proc
   deriving (Eq, Ord, Show, Generic, Typeable)
 
 newtype Program = Program {programInstrs :: [Instruction]}
-  deriving (Eq, Ord, Show, Generic, Typeable)
+  deriving (Eq, Ord, Show, Semigroup, Generic, Typeable)
 
 data Instruction
   = Exec ProcName -- exec.foo

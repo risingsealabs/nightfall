@@ -4,10 +4,13 @@ module Evaluation
     ( test_evaluation
     ) where
 
+import Nightfall.Lang.Internal.Types
 import Nightfall.Lang.Types
 import Nightfall.MASM.Miden
+import Nightfall.MASM.Types
 import Nightfall.Targets.Miden
 
+import Data.List
 import Control.Monad.State
 import Data.Word
 import Test.QuickCheck.Monadic
@@ -17,7 +20,7 @@ import Test.Tasty.QuickCheck
 evalZKProgram :: ZKProgram -> IO (Either String [Felt])
 evalZKProgram prog = do
     let (masm, _) = runState (transpile prog) defaultContext
-    runMiden DontKeep masm
+    runMiden DontKeep Nothing masm
 
 test_initGet :: TestTree
 test_initGet =
@@ -66,9 +69,31 @@ test_initSetGet =
         -- @x@. Otherwise, it must be some initial element that cannot be equal to @x@.
         pure $ if i == j then x === y else fromIntegral j === y .&&. x =/= y
 
+test_initLoadAll :: TestTree
+test_initLoadAll =
+    let name = "initLoadAll"
+    in testProperty name $ \(xs :: [Word64]) -> withMaxSuccess 50 . monadicIO $ do
+        let inputs = map fromIntegral xs
+            numWords = genericLength inputs
+            inputsAsWords = padListAsWords inputs
+            hashModule = toHashModule (fromIntegral numWords) inputsAsWords
+        -- Load the inputs into memory using 'toHashModule', then drop what's on the stack, then put
+        -- all the loaded inputs onto the stack one by one.
+        errOrRes <- liftIO $ runMiden DontKeep (Just $ fromIntegral numWords) hashModule
+            { moduleProg = (moduleProg hashModule <>) . Program $ concat
+                [ replicate 5 Drop
+                , map (MemLoad . Just . unsafeToMemoryIndex) [0 .. numWords - 1]
+                ]
+            }
+        outputs <- case errOrRes of
+            Left err      -> fail err
+            Right outputs -> pure outputs
+        pure $ inputs === reverse outputs
+
 test_evaluation :: TestTree
 test_evaluation =
     testGroup "Evaluation"
         [ test_initGet
         , test_initSetGet
+        , test_initLoadAll
         ]
