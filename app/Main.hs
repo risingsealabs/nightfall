@@ -34,12 +34,12 @@ main = do
 
     -- For now, trivial: argument is the name of the example to run
     when (length args < 1) $ do
-        progName <- getProgName
-        let str = "Usage: " ++ progName ++ " <example> [filepath] where <example> is one of:\n"
+        exampleName <- getProgName
+        let str = "Usage: " ++ exampleName ++ " <example> [filepath] where <example> is one of:\n"
             examples = unlines . Prelude.map ("    "++) . Map.keys $ allProgs
         error $ str ++ examples ++ "\n and [filepath] (optional) is path to write the MASM, otherwise stdout"
 
-    (masm, ctx) <- case Map.lookup (head args) allProgs of
+    masm <- case Map.lookup (head args) allProgs of
         Nothing -> do
             let str = "Example program \"" ++ head args ++ "\" not found. Available ones are:\n"
                 examples = unlines . Prelude.map ("    "++) . Map.keys $ allProgs
@@ -49,8 +49,8 @@ main = do
                                     , cfgTraceVariablesUsage = True
                                     }
                 context = defaultContext { config = cfg }
-            let (midenProg, ctx) = runState (transpile prog) context
-            return (midenProg, ctx)
+            let (midenProg, _) = runState (transpile prog) context
+            return midenProg
 
     -- Check if the user provided a path to write the program
     let io = if (length args >= 2)
