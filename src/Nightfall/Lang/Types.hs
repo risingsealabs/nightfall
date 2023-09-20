@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Nightfall.Lang.Types ( Felt
+                            , MidenWord(..)
                             , VarName
                             , FunName
                             , Statement_
@@ -11,6 +12,8 @@ module Nightfall.Lang.Types ( Felt
                             , ZKProgram(..)
                             , BodyF(..)
                             , Body(..)
+                            , SecretInputs(..)
+                            , emptySecretInputs
                             , runBody
                             , mkSimpleProgram
                             , mkZKProgram
@@ -30,6 +33,8 @@ module Nightfall.Lang.Types ( Felt
                             , isOdd
                             , varF
                             , varB
+                            , getAt
+                            , setAt
                             , statement
                             , statements
                             -- , fcall
@@ -37,6 +42,7 @@ module Nightfall.Lang.Types ( Felt
                             , ifElse
                             , simpleIf
                             , while
+                            , initArray
                             -- , nakedCall
                             , ret
                             , comment
@@ -45,26 +51,29 @@ module Nightfall.Lang.Types ( Felt
 
 import Nightfall.Lang.Internal.Types
 
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Text (Text)
 import Data.Foldable
 import Control.Monad.Free.Church
 import Data.Word (Word32)
 
 -- | Expression wrapper type, typed for safety, exposed to use
 newtype Expr a = Expr
-  { unExpr :: Expr_
-  } deriving (Eq, Show)
+    { unExpr :: Expr_
+    } deriving (Eq, Show)
 
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
 instance a ~ Felt => Num (Expr a) where
-  (+) = add
-  (-) = sub
-  (*) = mul
-  fromInteger = Expr . Lit . fromInteger
-  abs = error "'abs' not implemented for 'Expr'"
-  signum = error "'signum' not implemented for 'Expr'"
+    (+) = add
+    (-) = sub
+    (*) = mul
+    fromInteger = Expr . Lit . fromInteger
+    abs = error "'abs' not implemented for 'Expr'"
+    signum = error "'signum' not implemented for 'Expr'"
 
 data BodyF a = BodyF Statement_ a
-  deriving (Eq, Show, Functor)
+    deriving (Eq, Show, Functor)
 
 -- | A 'Body' represents a list of 'Statement_'s. We do not simply use @[Statement_]@, because
 --
@@ -76,6 +85,14 @@ newtype Body a = Body
     { unBody :: F BodyF a
     } deriving newtype (Functor, Applicative, Monad)
 
+data SecretInputs = SecretInputs
+    { _adviceStack :: [Felt],
+      _adviceMap :: Map Text [MidenWord]
+    } deriving (Eq, Ord, Show)
+
+emptySecretInputs :: SecretInputs
+emptySecretInputs = SecretInputs [] Map.empty
+
 data ZKProgram = ZKProgram
     { pName :: String
       -- ^ Program name, useful for tests.
@@ -83,8 +100,11 @@ data ZKProgram = ZKProgram
       -- ^ List of statements comprising the program
     , pPublicInputs :: [Felt]
       -- ^ Defining the public inputs as a list of field elements for now
-    , pSecretInputs :: Either [Felt] FilePath
+    , pSecretInputs :: Either SecretInputs FilePath
       -- ^ Either a list with private inputs or an inputs file path.
+      -- TODO: make it either just 'SecretInputs' or at least @IO SecretInputs@ or something.
+      -- 'FilePath' doesn't belong there.
+      -- TODO: is there a reason to merge public and secret inputs into a single data type?
     }
 
 -- | Helper to quickly make a simple @ZKProgram@ from a list of statements, no inputs
@@ -93,7 +113,7 @@ mkSimpleProgram name body = ZKProgram
     { pName = name
     , pBody = body
     , pPublicInputs = []
-    , pSecretInputs = Left []
+    , pSecretInputs = Left emptySecretInputs
     }
 
 -- | Helper to build a @ZKProgram@.
@@ -163,6 +183,9 @@ varF = Expr . VarF
 varB :: VarName -> Expr Bool
 varB = Expr . VarB
 
+getAt :: VarName -> Expr Felt -> Expr Felt
+getAt var (Expr i) = Expr $ GetAt var i
+
 -- Function calls will come later
 -- fcall :: FunName -> [Expr] -> Expr
 -- fcall = FCall
@@ -188,6 +211,9 @@ statements = traverse_ statement
 runBody :: Body () -> [Statement_]
 runBody body = runF (unBody body) (const []) $ \(BodyF stmt stmts) -> stmt : stmts
 
+setAt :: VarName -> Expr Felt -> Expr Felt -> Body ()
+setAt var (Expr i) (Expr val) = statement $ SetAt var i val
+
 ifElse :: Expr Bool -> Body () -> Body () -> Body ()
 ifElse (Expr cond) ifBlock elseBlock = statement $ IfElse cond (runBody ifBlock) (runBody elseBlock)
 
@@ -197,6 +223,9 @@ simpleIf cond ifBlock = ifElse cond ifBlock $ pure ()
 
 while :: Expr Bool -> Body () -> Body ()
 while (Expr cond) body = statement $ While cond (runBody body)
+
+initArray :: VarName -> [Felt] -> Body ()
+initArray var = statement . InitArray var
 
 -- nakedCall :: FunName -> [Expr] -> Body ()
 -- nakedCall = NakedCall

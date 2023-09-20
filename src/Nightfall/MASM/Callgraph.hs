@@ -2,8 +2,8 @@
 module Nightfall.MASM.Callgraph where
 
 import qualified Data.Graph as Graph
-import Data.Map ( Map )
-import qualified Data.Map as Map
+import Data.Map.Strict ( Map )
+import qualified Data.Map.Strict as Map
 import qualified Nightfall.MASM.Types as M
 
 findCalls :: M.Proc -> [M.ProcName]

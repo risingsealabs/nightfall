@@ -7,6 +7,7 @@ module Examples.Simple ( trivial1Prog
                        , simpleVar1Prog
                        , simpleVar2Prog
                        , simpleVar3Prog
+                       , simpleInitArray
                        ) where
 
 import Nightfall.Lang.Types
@@ -30,7 +31,7 @@ trivial1Prog :: ZKProgram
 trivial1Prog = ZKProgram { pName = "trivial 1"
                           , pBody = trivial1Body
                           , pPublicInputs = []
-                          , pSecretInputs = Left []
+                          , pSecretInputs = Left emptySecretInputs
                           }
 
 -- * Almost as simple a program, we just have one nested level
@@ -51,7 +52,7 @@ trivial2Prog :: ZKProgram
 trivial2Prog = ZKProgram { pName = "trivial 2"
                           , pBody = trivial2Body
                           , pPublicInputs = []
-                          , pSecretInputs = Left []
+                          , pSecretInputs = Left emptySecretInputs
                           }
 
 
@@ -73,7 +74,7 @@ trivial3Prog :: ZKProgram
 trivial3Prog = ZKProgram { pName = "trivial 3"
                           , pBody = trivial3Body
                           , pPublicInputs = []
-                          , pSecretInputs = Left []
+                          , pSecretInputs = Left emptySecretInputs
                           }
 
 -- * Another simple program that uses the Num instance t omake it easier to write and make sure it works
@@ -94,7 +95,7 @@ trivial4Prog :: ZKProgram
 trivial4Prog = ZKProgram { pName = "trivial 4"
                           , pBody = trivial4Body
                           , pPublicInputs = []
-                          , pSecretInputs = Left []
+                          , pSecretInputs = Left emptySecretInputs
                           }
 
 -- * Simple program using a variable to store a value
@@ -120,7 +121,7 @@ simpleVar1Prog :: ZKProgram
 simpleVar1Prog = ZKProgram { pName = "simple var 1"
                           , pBody = simpleVar1Body
                           , pPublicInputs = []
-                          , pSecretInputs = Left []
+                          , pSecretInputs = Left emptySecretInputs
                           }
 
 
@@ -152,7 +153,7 @@ simpleVar2Prog :: ZKProgram
 simpleVar2Prog = ZKProgram { pName = "simple var 2"
                           , pBody = simpleVar2Body
                           , pPublicInputs = []
-                          , pSecretInputs = Left []
+                          , pSecretInputs = Left emptySecretInputs
                           }
 
 -- * Simple program that overwrite the values of a variable several times
@@ -168,3 +169,12 @@ simpleVar3Body = do
 
 simpleVar3Prog :: ZKProgram
 simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Body
+
+simpleInitArray :: ZKProgram
+simpleInitArray = mkSimpleProgram "simple initArray" $ do
+    initArray "arr" [42, 0, 13, 885, 4, 193, 193]
+    comment "oldArrAt3 = arr[3]"
+    oldArrAt3 <- declare "oldArrAt3" $ getAt "arr" 3
+    setAt "arr" 3 1
+    comment "arr[1] + oldArrAt3 + arr[3] + arr[4] = 0 + 885 + 1 + 4 = 890"
+    ret $ getAt "arr" 1 + get oldArrAt3 + getAt "arr" 3 + getAt "arr" 4
