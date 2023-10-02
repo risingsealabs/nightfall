@@ -12,18 +12,18 @@ begin
   # var n
   mem_store.1
   push.1
-  # var length
+  # var len
   mem_store.2
   # var n (felt)
   mem_load.1
   push.1
   gt
   while.true
-    # var length (felt)
+    # var len (felt)
     mem_load.2
     push.1
     add
-    # var length
+    # var len
     mem_store.2
     # var n (felt)
     mem_load.1
@@ -50,6 +50,6 @@ begin
     push.1
     gt
   end
-  # var length (felt)
+  # var len (felt)
   mem_load.2
 end

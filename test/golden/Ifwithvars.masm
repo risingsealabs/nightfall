@@ -19,7 +19,7 @@ begin
   # var b (felt)
   mem_load.1
   add
-  # var sum
+  # var s
   mem_store.3
   push.10
   # var okVal
@@ -27,7 +27,7 @@ begin
   push.20
   # var nokVal
   mem_store.5
-  # var sum (felt)
+  # var s (felt)
   mem_load.3
   # var target (felt)
   mem_load.2

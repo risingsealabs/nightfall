@@ -1,9 +1,12 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Examples.Fun ( collatzFixedProg
                     , collatzPrivProg
                     ) where
 
 import Nightfall.Lang.Types
-
+import Nightfall.Lang.Syntax.Default
 
 -- * The Collatz Sequence, start from 10
 
@@ -23,15 +26,15 @@ collatzFixedStmts = do
     comment "Compute the Collatz sequence, starting from a fixed position: 10 and returns the length of the sequence."
     comment "It should return 7"
     emptyLine
-    declareVarF "start" 10
-    declareVarF "length" 1
-    declareVarF "n" (varF "start")
-    while (varF "n" `gt` 1) $ do
-        assignVarF "length" (varF "length" + 1)
-        ifElse (isOdd (varF "n"))
-            (assignVarF "n" (varF "n" * 3 + 1))
-            (assignVarF "n" (varF "n" `div'` 2))
-    ret $ varF "length"
+    start <- declare "start" 10
+    len <- declare "len" 1
+    n <- declare "n" $ get start
+    while (get n `gt` 1) $ do
+        set len $ get len + 1
+        ifElse (isOdd $ get n)
+            (set n $ get n * 3 + 1)
+            (set n $ get n `div'` 2)
+    ret $ get len
 
 collatzFixedProg :: ZKProgram
 collatzFixedProg = mkSimpleProgram "Fixed Collatz (10)" collatzFixedStmts
@@ -54,17 +57,15 @@ collatzPrivStmts = do
     comment "Compute the Collatz sequence, starting position taken from secret input"
     comment "It returns the length of the sequence"
     emptyLine
-    declareVarF "start" nextSecret
-    declareVarF "n" (varF "start")
-    declareVarF "length" 1
-    while (varF "n" `gt` 1) $ do
-        incVarF "length" 1
-        ifElse (isOdd (varF "n"))
-            -- (assignVarF "n" (varF "n" * 3 + 1))
-            (updateVarF "n" $ \n -> n * 3 + 1)
-            -- (assignVarF "n" (varF "n" `div'` 2))
-            (updateVarF "n" $ \n -> n `div'` 2)
-    ret $ varF "length"
+    start <- declare "start" nextSecret
+    n <- declare "n" $ get start
+    len <- declare "len" 1
+    while (get n `gt` 1) $ do
+        mut len $ \x -> add x 1
+        ifElse (isOdd $ get n)
+            (mut n $ \x -> x * 3 + 1)
+            (mut n $ \x -> x `div'` 2)
+    ret $ get len
 
 collatzPrivProg :: ZKProgram
 collatzPrivProg = mkZKProgram "collatz private" collatzPrivStmts [] "src/Examples/collatz_secrets.inputs"

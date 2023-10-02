@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module Examples.Simple ( trivial1Prog
                        , trivial2Prog
                        , trivial3Prog
@@ -9,6 +11,7 @@ module Examples.Simple ( trivial1Prog
                        ) where
 
 import Nightfall.Lang.Types
+import Nightfall.Lang.Syntax.Default
 
 -- * Simplest, most trivial program that adds to fixed numbers, no variable, no inputs (public or secret)
 
@@ -111,8 +114,8 @@ simpleVar1Body = do
     comment "Simple addition, but with a variable storing a value"
     comment "a = 999"
     comment "a + 1. It should return 1000"
-    declareVarF "a" (lit 999)
-    ret $ add (varF "a") (lit 1)
+    a <- declare "a" (lit 999)
+    ret $ add (get a) (lit 1)
 
 simpleVar1Prog :: ZKProgram
 simpleVar1Prog = ZKProgram { pName = "simple var 1"
@@ -141,10 +144,10 @@ simpleVar2Body = do
     comment "a = 888, b = 222"
     comment "c = a - b. Return c"
     comment "It should return 666"
-    declareVarF "a" 888
-    declareVarF "b" 222
-    declareVarF "c" (varF "a" - varF "b")
-    ret $ varF "c"
+    a <- declare "a" 888
+    b <- declare "b" 222
+    c <- declare "c" $ get a - get b
+    ret $ get c
 
 simpleVar2Prog :: ZKProgram
 simpleVar2Prog = ZKProgram { pName = "simple var 2"
@@ -159,10 +162,10 @@ simpleVar3Body :: Body ()
 simpleVar3Body = do
     comment "Rewrite on the same variable several times"
     comment "a = 10, b = 20, a = 50, a + b. Should return 70"
-    declareVarF "a" 10
-    declareVarF "b" 20
-    assignVarF "a" 50
-    ret $ varF "a" + varF "b"
+    a <- declare "a" 10
+    b <- declare "b" 20
+    set a 50
+    ret $ get a + get b
 
 simpleVar3Prog :: ZKProgram
 simpleVar3Prog = mkSimpleProgram "simple var 3" simpleVar3Body
@@ -171,7 +174,7 @@ simpleInitArray :: ZKProgram
 simpleInitArray = mkSimpleProgram "simple initArray" $ do
     initArray "arr" [42, 0, 13, 885, 4, 193, 193]
     comment "oldArrAt3 = arr[3]"
-    declareVarF "oldArrAt3" $ getAt "arr" 3
+    oldArrAt3 <- declare "oldArrAt3" $ getAt "arr" 3
     setAt "arr" 3 1
     comment "arr[1] + oldArrAt3 + arr[3] + arr[4] = 0 + 885 + 1 + 4 = 890"
-    ret $ getAt "arr" 1 + varF "oldArrAt3" + getAt "arr" 3 + getAt "arr" 4
+    ret $ getAt "arr" 1 + get oldArrAt3 + getAt "arr" 3 + getAt "arr" 4
