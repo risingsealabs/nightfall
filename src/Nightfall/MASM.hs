@@ -65,14 +65,20 @@ ppInstr (While body) = do
   "while.true"
   indent $ traverse_ ppInstr body
   "end"
+ppInstr (Repeat count body) = do
+  [ "repeat." ++ show count ]
+  indent $ traverse_ ppInstr body
+  "end"
 
 ppInstr (LocStore n) = [ "loc_store." ++ show n ]
 ppInstr (LocLoad n) = [ "loc_load." ++ show n ]
 
 ppInstr (AdvPush n) = [ "adv_push." ++ show n ]
 ppInstr (Push ns) = [ "push" ++ concatMap (\n -> '.' : show n) ns ]
+ppInstr Padw = [ "padw" ]
 ppInstr (Swap n) = [ "swap" ++ if unStackIndex n == 1 then "" else "." ++ show n ]
 ppInstr Drop = "drop"
+ppInstr Dropw = "dropw"
 ppInstr CDrop = "cdrop"
 ppInstr (Dup n) = [ "dup." ++ show n ]
 ppInstr (MoveUp n) = [ "movup." ++ show n ]
@@ -122,7 +128,9 @@ ppInstr IRotr = "u32checked_rotr"
 ppInstr IPopcnt = "u32checked_popcnt"
 
 ppInstr (MemLoad mi) = [ "mem_load" ++ maybe "" (\i -> "." ++ show i) mi ]
+ppInstr (MemLoadw mi) = [ "mem_loadw" ++ maybe "" (\i -> "." ++ show i) mi ]
 ppInstr (MemStore mi) = [ "mem_store" ++ maybe "" (\i -> "." ++ show i) mi ]
+ppInstr (MemStorew mi) = [ "mem_storew" ++ maybe "" (\i -> "." ++ show i) mi ]
 ppInstr IAdd64 = "exec.u64::wrapping_add"
 ppInstr ISub64 = "exec.u64::wrapping_sub"
 ppInstr IMul64 = "exec.u64::wrapping_mul"

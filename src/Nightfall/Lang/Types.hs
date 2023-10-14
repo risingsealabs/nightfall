@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -51,24 +52,33 @@ module Nightfall.Lang.Types ( Felt
 
 import Nightfall.Lang.Internal.Types
 
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Text (Text)
-import Data.Foldable
 import Control.Monad.Free.Church
+import Data.Foldable
+import Data.Map.Strict (Map)
+import Data.Text (Text)
 import Data.Word (Word32)
+import qualified Data.Map.Strict as Map
 
 -- | Expression wrapper type, typed for safety, exposed to use
 newtype Expr a = Expr
     { unExpr :: Expr_
     } deriving (Eq, Show)
 
+class IsBuiltin a where
+    mkConstant :: a -> Constant
+
+instance IsBuiltin Felt where
+    mkConstant = ConstantFelt
+
+constant :: IsBuiltin a => a -> Expr a
+constant = Expr . Constant . mkConstant
+
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
 instance a ~ Felt => Num (Expr a) where
     (+) = add
     (-) = sub
     (*) = mul
-    fromInteger = Expr . Lit . fromInteger
+    fromInteger = constant . fromInteger
     abs = error "'abs' not implemented for 'Expr'"
     signum = error "'signum' not implemented for 'Expr'"
 
@@ -125,8 +135,8 @@ mkZKProgram name body pubs secretFP = ZKProgram
     , pSecretInputs = Right secretFP
     }
 
--- * "Smart Constructors" for building (type-safe) @Expr. They are the ones exposed for users to use instead of constructing the
--- types directly.
+-- * "Smart Constructors" for building (type-safe) @Expr. They are the ones exposed for users to use
+-- instead of constructing the types directly.
 
 -- ** Literals
 
@@ -135,6 +145,9 @@ lit = Expr . Lit
 
 bool :: Bool -> Expr Bool
 bool = Expr . Bo
+
+cast128to256 :: Expr (UInt 128) -> Expr (UInt 256)
+cast128to256 (Expr e) = Expr e
 
 -- ** Arithmetic operations
 
@@ -178,10 +191,10 @@ isOdd (Expr e) = Expr $ UnOp IsOdd e
 
 -- ** Variables (typed)
 varF :: VarName -> Expr Felt
-varF = Expr . VarF
+varF = Expr . Var
 
 varB :: VarName -> Expr Bool
-varB = Expr . VarB
+varB = Expr . Var
 
 getAt :: VarName -> Expr Felt -> Expr Felt
 getAt var (Expr i) = Expr $ GetAt var i

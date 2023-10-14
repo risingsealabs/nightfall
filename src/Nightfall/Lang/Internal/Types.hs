@@ -1,3 +1,9 @@
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+
 module Nightfall.Lang.Internal.Types
     ( module Nightfall.Lang.Internal.Types
     , Felt
@@ -6,10 +12,14 @@ module Nightfall.Lang.Internal.Types
     , feltOrderInteger
     ) where
 
-import Nightfall.Lang.Internal.Felt
-import Data.Word (byteSwap64)
-import Text.Printf (printf)
+import Data.Mod
 import Data.String
+import Data.Type.Equality
+import Data.Word
+import GHC.Natural
+import GHC.TypeNats hiding (Mod)
+import Nightfall.Lang.Internal.Felt
+import Text.Printf (printf)
 
 {- Note [The design of arrays]
 Currently we support three operations:
@@ -39,41 +49,76 @@ type VarName = String
 
 type FunName = String
 
+type UInt = Mod
+
+data SomeUInt = forall bits. KnownNat bits => SomeUInt (UInt bits)
+
+deriving instance Show SomeUInt
+
+instance Eq SomeUInt where
+    SomeUInt (i1 :: Mod bits1) == SomeUInt (i2 :: Mod bits2) =
+        case testEquality (SNat @bits1) (SNat @bits2) of
+            Just Refl -> i1 == i2
+            Nothing   -> error "nope"
+
+data VarType =
+      VarFelt
+    | VarBool
+    | VarArrayOfFelt Word32  -- The argument is the length of the array.
+    | VarUInt Word16         -- The argument is the number of bits, 65535 should be enough for all
+                             -- practical use cases.
+    deriving (Eq, Show)
+
+ppVarType :: VarType -> String
+ppVarType VarFelt              = "felt"
+ppVarType VarBool              = "bool"
+ppVarType (VarArrayOfFelt len) = "[felt; " ++ show len ++ "]"
+ppVarType (VarUInt bits)       = "u" ++ show bits
+
+isArrayOfFelt :: VarType -> Bool
+isArrayOfFelt VarArrayOfFelt{} = True
+isArrayOfFelt _                = False
+
 -- | Unary operations.
 data UnOp =
-      Not    -- ^ !a
-    | IsOdd  -- a `mod` 2 == 1
+      Not    -- ^ @!a@
+    | IsOdd  -- ^ @a `mod` 2 == 1@
+    | Cast128to256
     deriving (Eq, Show)
 
 -- | Binary operations.
 data BinOp =
     -- Arithmetic operations
-      Add     -- ^ a + b
-    | Sub     -- ^ a - b
-    | Mul     -- ^ a * b
-    | Div     -- ^ a / b (integer division)
-    | IDiv32  -- ^ a `quot` b with a and b being 'Word32'
+      Add     -- ^ @a + b@
+    | Sub     -- ^ @a - b@
+    | Mul     -- ^ @a * b@
+    | Div     -- ^ @a / b@ (integer division)
+    | IDiv32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
+    | Div256by128
+    | Mod256by128
 
     -- Boolean operations
-    | Equal      -- ^ a == b
-    | Lower      -- ^ a < b
-    | LowerEq    -- ^ a <= b
-    | Greater    -- ^ a > b
-    | GreaterEq  -- ^ a >= b
+    | Equal      -- ^ @a == b@
+    | Lower      -- ^ @a < b@
+    | LowerEq    -- ^ @a <= b@
+    | Greater    -- ^ @a > b@
+    | GreaterEq  -- ^ @a >= b@
+    deriving (Eq, Show)
+
+data Constant =
+      ConstantFelt Felt
+    | ConstantUInt SomeUInt
+    | ConstantBool Bool
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
 data Expr_ =
-    -- | Literals
-      Lit Felt  -- ^ 309183, 2398713, whatever
-    | Bo Bool   -- ^ true/false, 1/0
+      Constant Constant
 
     | UnOp UnOp Expr_
     | BinOp BinOp Expr_ Expr_
 
-    -- | Variables
-    | VarF VarName     -- ^ "calling" a variable of type Felt by its name (e.g. "foo")
-    | VarB VarName     -- ^ same, but with boolean variable
+    | Var VarName
 
     | GetAt VarName Expr_
 
@@ -87,7 +132,7 @@ data Expr_ =
 -- | Simple, internal type, not exposed
 data Statement_ =
     -- | Variable declaration
-      DeclVariable VarName Expr_  -- ^ let a = 634
+      DeclVariable VarType VarName Expr_  -- ^ let a = 634
     
     -- | Variable assignment
     | AssignVar VarName Expr_     -- ^ a <- 368
@@ -96,6 +141,7 @@ data Statement_ =
 
     -- | Conditionals
     | IfElse Expr_ [Statement_] [Statement_] -- ^ condition if-block else-block
+    | Repeat Natural [Statement_]
     | While Expr_ [Statement_]               -- ^ condition body
 
     -- | Naked function call

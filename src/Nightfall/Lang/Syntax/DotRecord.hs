@@ -26,10 +26,11 @@ module Nightfall.Lang.Syntax.DotRecord where
 import Nightfall.Lang.Types
 import Nightfall.Lang.Internal.Types
 
-import GHC.TypeLits
-import GHC.Records
-import GHC.Exts
 import Data.Kind
+import Data.Proxy
+import GHC.Exts
+import GHC.Records
+import GHC.TypeLits
 import Unsafe.Coerce (UnsafeEquality (..), unsafeEqualityProof)
 
 {- Note [Surface syntax through OverloadedRecordDot]
@@ -198,16 +199,19 @@ data DeclTypeOf name a where
 type KnownDecl :: (Symbol -> Type) -> Type -> Constraint
 class KnownDecl decl a | decl -> a, a -> decl where
     knownDecl :: forall name. TypeOf name ~ a => decl name
+    varType :: Proxy a -> VarType
 
 data DeclFelt name where
     Felt :: TypeOf name ~ Felt => DeclFelt name
 instance KnownDecl DeclFelt Felt where
     knownDecl = Felt
+    varType _ = VarFelt
 
 data DeclBool name where
     Bool :: TypeOf name ~ Bool => DeclBool name
 instance KnownDecl DeclBool Bool where
     knownDecl = Bool
+    varType _ = VarBool
 
 class KnownType a where
     knownType :: forall name. TypeOf name ~ a => DeclTypeOf name a
@@ -246,7 +250,7 @@ instance
         ) => HasField name (Prefix "declare" a) res where
     getField _ (Expr expr_) = do
         let name = symbolVal' (proxy# @name)
-        statement $ DeclVariable name expr_
+        statement $ DeclVariable (varType $ Proxy @a) name expr_
         -- It would be very dangerous to allow for forging multiple @TypeOf name ~ a1@,
         -- @TypeOf name ~ a2@ etc constraints, since GHC could conclude @a1 ~ a2@ from those,
         -- which for all intents and purposes would be implicit uncontrolled 'unsafeCoerce', but
@@ -257,11 +261,7 @@ instance
 
 instance (res ~ Expr a, TypeOf name ~ a, KnownSymbol name, KnownType a) =>
         HasField name (Prefix "get" a) res where
-    getField _ = Expr $ case knownType @a @name of
-        DeclFelt -> VarF name
-        DeclBool -> VarB name
-      where
-        name = symbolVal' (proxy# @name)
+    getField _ = Expr . Var $ symbolVal' (proxy# @name)
 
 -- 'KnownType' is only needed to prevent @set.x@ from being successfully type checked when there's
 -- no @x@ in the current scope. Without the constraint, GHC would happily infer
