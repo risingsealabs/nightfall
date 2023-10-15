@@ -19,7 +19,6 @@ module Nightfall.Lang.Types ( Felt
                             , mkSimpleProgram
                             , mkZKProgram
                             , lit
-                            , bool
                             , add
                             , sub
                             , mul
@@ -65,20 +64,23 @@ newtype Expr a = Expr
     } deriving (Eq, Show)
 
 class IsBuiltin a where
-    mkConstant :: a -> Constant
+    literal :: a -> Literal
 
 instance IsBuiltin Felt where
-    mkConstant = ConstantFelt
+    literal = LiteralFelt
 
-constant :: IsBuiltin a => a -> Expr a
-constant = Expr . Constant . mkConstant
+instance IsBuiltin Bool where
+    literal = LiteralBool
+
+lit :: IsBuiltin a => a -> Expr a
+lit = Expr . Literal . literal
 
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
 instance a ~ Felt => Num (Expr a) where
     (+) = add
     (-) = sub
     (*) = mul
-    fromInteger = constant . fromInteger
+    fromInteger = lit . fromInteger
     abs = error "'abs' not implemented for 'Expr'"
     signum = error "'signum' not implemented for 'Expr'"
 
@@ -139,15 +141,6 @@ mkZKProgram name body pubs secretFP = ZKProgram
 -- instead of constructing the types directly.
 
 -- ** Literals
-
-lit :: Felt -> Expr Felt
-lit = Expr . Lit
-
-bool :: Bool -> Expr Bool
-bool = Expr . Bo
-
-cast128to256 :: Expr (UInt 128) -> Expr (UInt 256)
-cast128to256 (Expr e) = Expr e
 
 -- ** Arithmetic operations
 

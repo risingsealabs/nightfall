@@ -282,9 +282,8 @@ transpileStatement EmptyLine = return . singleton $ MASM.EmptyL
 
 -- | Transpile an unary operation.
 transpileUnOp :: UnOp -> [Instruction]
-transpileUnOp NFTypes.Not          = [ MASM.Not   ]
-transpileUnOp NFTypes.IsOdd        = [ MASM.IsOdd ]
-transpileUnOp NFTypes.Cast128to256 = [ MASM.Padw  ]
+transpileUnOp NFTypes.Not   = [ MASM.Not   ]
+transpileUnOp NFTypes.IsOdd = [ MASM.IsOdd ]
 
 -- | Transpile a binary operation.
 transpileBinOp :: BinOp -> [Instruction]
@@ -300,16 +299,16 @@ transpileBinOp LowerEq        = [ MASM.Lte ]
 transpileBinOp Greater        = [ MASM.Gt ]
 transpileBinOp GreaterEq      = [ MASM.Gte ]
 
+transpileLiteral :: Literal -> State Context [Instruction]
+transpileLiteral (LiteralFelt x) = return . singleton $ Push [x]
+transpileLiteral (LiteralBool b) = return . singleton $ Push [if b then 1 else 0]
+
 -- TODO: range check, etc.
 transpileExpr :: Expr_ -> State Context [Instruction]
 -- transpileExpr (Lit _) = error "Can't transpile standalone literal" -- should be simply push it to the stack??
 -- transpileExpr (Bo _)  = error "Can't transpile standalone boolean"
 -- | Literals are simply pushed onto the stack
-transpileExpr (Lit felt) = do
-    return . singleton $ Push [felt]
-transpileExpr (Bo bo) = do
-    let felt = if bo then 1 else 0
-    return . singleton $ Push [felt]
+transpileExpr (Literal l) = transpileLiteral l
 
 transpileExpr (Var varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack

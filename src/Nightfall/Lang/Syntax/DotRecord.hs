@@ -101,16 +101,16 @@ boolean one:
 
     declareSetGetBool :: Body ()
     declareSetGetBool = do
-        Bool <- declare.x $ bool True
-        set.x $ bool False
+        Bool <- declare.x $ lit True
+        set.x $ lit False
         ret get.x
 
 or instead of a single-letter name use something more appropriate for serious production:
 
     declareSetGetProductionBool :: Body ()
     declareSetGetProductionBool = do
-        Bool <- declare.suchEnterpriseNameWowMuchDescriptive $ bool True
-        set.suchEnterpriseNameWowMuchDescriptive $ bool False
+        Bool <- declare.suchEnterpriseNameWowMuchDescriptive $ lit True
+        set.suchEnterpriseNameWowMuchDescriptive $ lit False
         ret get.suchEnterpriseNameWowMuchDescriptive
 
 If you attempt to declare the same variable twice, you'll get a Haskell type error:
@@ -130,7 +130,7 @@ error:
     declareFeltBool = do
         -- error: [GHC-18872]
         --     • Couldn't match type ‘DeclBool’ with ‘DeclFelt’
-        Felt <- declare.x $ bool True
+        Felt <- declare.x $ lit True
         pure ()
 
 If you attempt to use an undeclared variable, you'll get a Haskell type error too, although not a

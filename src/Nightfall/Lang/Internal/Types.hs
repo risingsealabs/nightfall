@@ -12,12 +12,9 @@ module Nightfall.Lang.Internal.Types
     , feltOrderInteger
     ) where
 
-import Data.Mod
 import Data.String
-import Data.Type.Equality
 import Data.Word
 import GHC.Natural
-import GHC.TypeNats hiding (Mod)
 import Nightfall.Lang.Internal.Felt
 import Text.Printf (printf)
 
@@ -49,31 +46,16 @@ type VarName = String
 
 type FunName = String
 
-type UInt = Mod
-
-data SomeUInt = forall bits. KnownNat bits => SomeUInt (UInt bits)
-
-deriving instance Show SomeUInt
-
-instance Eq SomeUInt where
-    SomeUInt (i1 :: Mod bits1) == SomeUInt (i2 :: Mod bits2) =
-        case testEquality (SNat @bits1) (SNat @bits2) of
-            Just Refl -> i1 == i2
-            Nothing   -> error "nope"
-
 data VarType =
       VarFelt
     | VarBool
     | VarArrayOfFelt Word32  -- The argument is the length of the array.
-    | VarUInt Word16         -- The argument is the number of bits, 65535 should be enough for all
-                             -- practical use cases.
     deriving (Eq, Show)
 
 ppVarType :: VarType -> String
 ppVarType VarFelt              = "felt"
 ppVarType VarBool              = "bool"
 ppVarType (VarArrayOfFelt len) = "[felt; " ++ show len ++ "]"
-ppVarType (VarUInt bits)       = "u" ++ show bits
 
 isArrayOfFelt :: VarType -> Bool
 isArrayOfFelt VarArrayOfFelt{} = True
@@ -83,7 +65,6 @@ isArrayOfFelt _                = False
 data UnOp =
       Not    -- ^ @!a@
     | IsOdd  -- ^ @a `mod` 2 == 1@
-    | Cast128to256
     deriving (Eq, Show)
 
 -- | Binary operations.
@@ -94,8 +75,6 @@ data BinOp =
     | Mul     -- ^ @a * b@
     | Div     -- ^ @a / b@ (integer division)
     | IDiv32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
-    | Div256by128
-    | Mod256by128
 
     -- Boolean operations
     | Equal      -- ^ @a == b@
@@ -105,15 +84,14 @@ data BinOp =
     | GreaterEq  -- ^ @a >= b@
     deriving (Eq, Show)
 
-data Constant =
-      ConstantFelt Felt
-    | ConstantUInt SomeUInt
-    | ConstantBool Bool
+data Literal =
+      LiteralFelt Felt
+    | LiteralBool Bool
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
 data Expr_ =
-      Constant Constant
+      Literal Literal
 
     | UnOp UnOp Expr_
     | BinOp BinOp Expr_ Expr_
