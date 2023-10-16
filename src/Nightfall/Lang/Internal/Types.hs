@@ -1,9 +1,3 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-
 module Nightfall.Lang.Internal.Types
     ( module Nightfall.Lang.Internal.Types
     , Felt
@@ -51,15 +45,6 @@ data VarType =
     | VarBool
     | VarArrayOfFelt Word32  -- The argument is the length of the array.
     deriving (Eq, Show)
-
-ppVarType :: VarType -> String
-ppVarType VarFelt              = "felt"
-ppVarType VarBool              = "bool"
-ppVarType (VarArrayOfFelt len) = "[felt; " ++ show len ++ "]"
-
-isArrayOfFelt :: VarType -> Bool
-isArrayOfFelt VarArrayOfFelt{} = True
-isArrayOfFelt _                = False
 
 -- | Unary operations.
 data UnOp =
@@ -136,6 +121,15 @@ data Statement_ =
     -- | Allow to add empty lines in the generated code, for clarity
     | EmptyLine
     deriving (Eq, Show)
+
+ppVarType :: VarType -> String
+ppVarType VarFelt              = "felt"
+ppVarType VarBool              = "bool"
+ppVarType (VarArrayOfFelt len) = "[felt; " ++ show len ++ "]"
+
+isArrayOfFelt :: VarType -> Bool
+isArrayOfFelt VarArrayOfFelt{} = True
+isArrayOfFelt _                = False
 
 -- | What Miden considers to be a Word.
 data MidenWord = MidenWord

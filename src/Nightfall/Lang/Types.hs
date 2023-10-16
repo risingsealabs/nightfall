@@ -31,8 +31,6 @@ module Nightfall.Lang.Types ( Felt
                             , gt
                             , gte
                             , isOdd
-                            , varF
-                            , varB
                             , getAt
                             , setAt
                             , statement
@@ -181,13 +179,6 @@ gte (Expr e1) (Expr e2) = Expr $ BinOp GreaterEq e1 e2
 
 isOdd :: Expr Felt -> Expr Bool
 isOdd (Expr e) = Expr $ UnOp IsOdd e
-
--- ** Variables (typed)
-varF :: VarName -> Expr Felt
-varF = Expr . Var
-
-varB :: VarName -> Expr Bool
-varB = Expr . Var
 
 getAt :: VarName -> Expr Felt -> Expr Felt
 getAt var (Expr i) = Expr $ GetAt var i

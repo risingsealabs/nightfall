@@ -92,7 +92,7 @@ Here's how this program elaborates:
     >>> traverse_ print $ runBody declareSetGetFelt
     DeclVariable "x" (Lit (42 `modulo` 18446744069414584321))
     AssignVar "x" (Lit (3 `modulo` 18446744069414584321))
-    Return (VarF "x")
+    Return (Var "x")
 
 As you can see the @x@ name that we introduced via @declare@ became the @"x"@ name in the code.
 
