@@ -6,6 +6,7 @@ module Nightfall.Targets.Miden ( Context(..)
                                , defaultContext
                                , Config(..)
                                , defaultConfig
+                               , VarInfo(..)
                                , toHashModule
                                , transpile
                                ) where
@@ -15,18 +16,20 @@ import Nightfall.Lang.Types
 import Nightfall.MASM.Types as MASM
 import Nightfall.MASM.Miden
 
+import Control.Monad
 import Control.Monad.State
 import Data.Coerce (coerce)
+import Data.Foldable
 import Data.List (genericLength, singleton)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import Data.Monoid
 import Data.Set (Set)
+import Data.Word
+import System.IO.Unsafe
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as SText
 import qualified Data.Text as Strict (Text)
-import Data.Word
-import System.IO.Unsafe
 
 -- | Applicatively fold a 'Foldable'.
 foldMapA
@@ -48,12 +51,17 @@ defaultConfig = Config
     , cfgTraceVariablesUsage = False
 }
 
+data VarInfo = VarInfo
+    { _varInfoType :: VarType
+    , _varInfoPos  :: MemoryIndex
+    }
+
 -- TODO: a Note about 'adviceMapExt' and 'importExt'.
 -- | Context for the transpilation, this is the state of the State Monad in which transpilation happens
 data Context = Context
     { progName :: String                   -- ^ Name of the program, for outputs logs, etc.
     , memPos :: MemoryIndex                -- ^ Next free indice in Miden's global memory
-    , variables :: Map String MemoryIndex  -- ^ Variables in the EDSL are stored in Miden's random
+    , variables :: Map String VarInfo      -- ^ Variables in the EDSL are stored in Miden's random
                                              -- access memory, we keep a map to match them
     , adviceMapExt :: Map Strict.Text [MidenWord]  -- ^ Entries to add to the inputs file
     , importExt :: Set Strict.Text         -- ^ Imports to add to the final program
@@ -97,23 +105,30 @@ getHash numWords midenWords =
     -- TODO: should transpilation work in IO instead or can we treat 'runMiden' as "morally-pure"?
     fmap reverse . unsafePerformIO $ runMiden DontKeep (Just 4) $ toHashModule numWords midenWords
 
+toNumWords :: VarType -> Word32
+toNumWords VarFelt              = 1
+toNumWords VarBool              = 1
+toNumWords (VarArrayOfFelt len) = len
+
 -- | Allocate memory for a variable.
 alloc
     :: VarName
-    -> Word32  -- ^ How many Miden words to allocate.
+    -> VarType
     -> State Context MemoryIndex
-alloc var numWords = do
-    varPos <- gets memPos
+alloc var varType = do
     vars <- gets variables
     if Map.member var vars
         then error $ "Variable '" ++ var ++ "' has already been declared!"
-        else modify $ \ctx -> ctx
-            { memPos = case toMemoryIndex $ unMemoryIndex varPos + fromIntegral numWords of
-                Nothing      -> error "Out of Miden's memory"
-                Just memPos' -> memPos'
-            , variables = Map.insert var varPos vars
-            }
-    pure varPos
+        else do
+            varPos <- gets memPos
+            let numWords = toNumWords varType
+            modify $ \ctx -> ctx
+                { memPos = case toMemoryIndex $ unMemoryIndex varPos + fromIntegral numWords of
+                    Nothing      -> error "Out of Miden's memory"
+                    Just memPos' -> memPos'
+                , variables = Map.insert var (VarInfo varType varPos) vars
+                }
+            pure varPos
 
 -- | Entry point: transpile a EDSL-described ZK program into a Miden Module
 transpile :: ZKProgram -> State Context Module
@@ -152,15 +167,18 @@ transpileStatement (IfElse cond ifBlock elseBlock) = do
     -- I'm supposing it takes a pop/drop operation + a comparison
     cond' <- transpileExpr cond
     return $ cond' <> [ MASM.If ifBlock' elseBlock' ]
+transpileStatement (NFTypes.Repeat count body) = do
+    body' <- foldMapA transpileStatement body
+    return $ [ MASM.Repeat count body' ]
 transpileStatement (NFTypes.While cond body) = do
     body' <- foldMapA transpileStatement body
     cond' <- transpileExpr cond
     return $ cond' <> [ MASM.While $ body' <> cond' ]
 
 -- | Declaring a variable loads the expression into Miden's global memory, and we track the index in memory
-transpileStatement (DeclVariable var e) = do
+transpileStatement (DeclVariable varType var e) = do
     cfg <- gets config
-    varPos <- alloc var 1
+    varPos <- alloc var varType
     -- Trace the variable declaration if configured
     let traceVar = [MASM.Comment $ "var " <> SText.pack var | cgfTraceVariablesDecl cfg]
     -- Transpile the variable value
@@ -179,18 +197,20 @@ transpileStatement (AssignVar var e) = do
             , var
             , "\" has not been declared before: can't assign value"
             ]
-        Just pos -> do
+        Just varInfo -> do
             -- Trace the variable usage if configured
             let traceVar = [MASM.Comment $ "var " <> SText.pack var | shouldTrace]
             e' <- transpileExpr e
-            return $ e' <> traceVar <> [ MASM.MemStore . Just $ pos ]
+            return $ e' <> traceVar <> [ MASM.MemStore . Just $ _varInfoPos varInfo ]
 
 transpileStatement (SetAt arr i val) = do
     vars <- gets variables
-    -- TODO: also check that @arr@ is an array.
-    case unMemoryIndex <$> Map.lookup arr vars of
+    case Map.lookup arr vars of
         Nothing -> error $ "variable \"" ++ arr ++ "\" unknown (undeclared)"
-        Just arrPos -> do
+        Just varInfo -> do
+            unless (isArrayOfFelt $ _varInfoType varInfo) $
+                error $ "'" ++ arr ++ "' is used as an array, but it's not one"
+            let arrPos = unMemoryIndex $ _varInfoPos varInfo
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar =
                     [ MASM.Comment $ "an element of '" <> SText.pack arr <> "' number"
@@ -218,7 +238,7 @@ transpileStatement (NakedCall fname args) = do
 transpileStatement (InitArray arr inputs) = do
     let numWords = genericLength inputs
         inputsAsWords = padListAsWords inputs
-    arrPos <- alloc arr numWords
+    arrPos <- alloc arr $ VarArrayOfFelt numWords
     let hash = either error id $ getHash numWords inputsAsWords
     -- TODO: use @lens@ already.
     modify $ \ctx -> ctx
@@ -279,45 +299,39 @@ transpileBinOp LowerEq        = [ MASM.Lte ]
 transpileBinOp Greater        = [ MASM.Gt ]
 transpileBinOp GreaterEq      = [ MASM.Gte ]
 
+transpileLiteral :: Literal -> State Context [Instruction]
+transpileLiteral (LiteralFelt x) = return . singleton $ Push [x]
+transpileLiteral (LiteralBool b) = return . singleton $ Push [if b then 1 else 0]
+
 -- TODO: range check, etc.
 transpileExpr :: Expr_ -> State Context [Instruction]
 -- transpileExpr (Lit _) = error "Can't transpile standalone literal" -- should be simply push it to the stack??
 -- transpileExpr (Bo _)  = error "Can't transpile standalone boolean"
 -- | Literals are simply pushed onto the stack
-transpileExpr (Lit felt) = do
-    return . singleton $ Push [felt]
-transpileExpr (Bo bo) = do
-    let felt = if bo then 1 else 0
-    return . singleton $ Push [felt]
+transpileExpr (Literal l) = transpileLiteral l
 
--- Using a variable means we fetch the value from (global) memory and push it to the stack
-transpileExpr (VarF varname) = do
+transpileExpr (Var varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack
     vars <- gets variables
     case Map.lookup varname vars of
-        Nothing -> error $ "Felt variable \"" ++ varname ++ "\" unknown (undeclared)"
-        Just idx -> do
+        Nothing -> error $ "variable '" ++ varname ++ "' unknown (undeclared)"
+        Just varInfo -> do
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar =
-                    [MASM.Comment $ "var " <> SText.pack varname <> " (felt)" | shouldTrace]
-            return $ traceVar <> [MemLoad . Just $ idx]
-transpileExpr (VarB varname) = do
-    -- Fetch the memory location of that variable in memory, and push it to the stack
-    vars <- gets variables
-    case Map.lookup varname vars of
-        Nothing -> error $ "Boolean variable \"" ++ varname ++ "\" unknown (undeclared)"
-        Just idx -> do
-            shouldTrace <- gets (cfgTraceVariablesUsage . config)
-            let traceVar =
-                    [MASM.Comment $ "var " <> SText.pack varname <> " (bool)" | shouldTrace]
-            return $ traceVar <> [MemLoad . Just $ idx]
+                    [ MASM.Comment . SText.pack $ fold
+                        ["var ", varname, " (", ppVarType $ _varInfoType varInfo, ")"]
+                    | shouldTrace
+                    ]
+            return $ traceVar <> [MemLoad . Just $ _varInfoPos varInfo]
 
 transpileExpr (GetAt arr i) = do
     vars <- gets variables
-    -- TODO: also check that @arr@ is an array.
-    case unMemoryIndex <$> Map.lookup arr vars of
+    case Map.lookup arr vars of
         Nothing -> error $ "Array variable \"" ++ arr ++ "\" unknown (undeclared)"
-        Just arrPos -> do
+        Just varInfo -> do
+            unless (isArrayOfFelt $ _varInfoType varInfo) $
+                error $ "'" ++ arr ++ "' is used as an array, but it's not one"
+            let arrPos = unMemoryIndex $ _varInfoPos varInfo
             shouldTrace <- gets (cfgTraceVariablesUsage . config)
             let traceVar =
                     [ MASM.Comment $ "an element of '" <> SText.pack arr <> "' number"

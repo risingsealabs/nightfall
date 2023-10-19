@@ -9,7 +9,7 @@ data DeclType a where
     Felt :: DeclType Felt
     Bool :: DeclType Bool
 
-data Var a = Var
+data Binding a = Binding
     { _varDeclType :: DeclType a
     , _varName     :: VarName
     }
@@ -23,21 +23,23 @@ instance KnownDeclType Felt where
 instance KnownDeclType Bool where
     knownDeclType = Bool
 
-declareOf :: DeclType a -> VarName -> Expr a -> Body (Var a)
-declareOf declType varName expr = do
-    statement . DeclVariable varName $ unExpr expr
-    pure $ Var declType varName
+toVarType :: DeclType a -> VarType
+toVarType Felt = VarFelt
+toVarType Bool = VarBool
 
-declare :: KnownDeclType a => VarName -> Expr a -> Body (Var a)
+declareOf :: DeclType a -> VarName -> Expr a -> Body (Binding a)
+declareOf declType varName expr = do
+    statement . DeclVariable (toVarType declType) varName $ unExpr expr
+    pure $ Binding declType varName
+
+declare :: KnownDeclType a => VarName -> Expr a -> Body (Binding a)
 declare = declareOf knownDeclType
 
-get :: Var a -> Expr a
-get (Var declType name) = case declType of
-    Felt -> Expr $ VarF name
-    Bool -> Expr $ VarB name
+get :: Binding a -> Expr a
+get (Binding _ name) = Expr $ Var name
 
-set :: Var a -> Expr a -> Body ()
+set :: Binding a -> Expr a -> Body ()
 set var expr = statement $ AssignVar (_varName var) (unExpr expr)
 
-mut :: Var a -> (Expr a -> Expr a) -> Body ()
+mut :: Binding a -> (Expr a -> Expr a) -> Body ()
 mut var f = set var . f $ get var

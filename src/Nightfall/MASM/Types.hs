@@ -23,14 +23,15 @@ import Nightfall.MASM.Integral
 import Nightfall.Lang.Types
 
 import Control.Monad.Writer.Strict
-import qualified Data.DList as DList
 import Data.Map.Strict (Map)
 import Data.String
 import Data.Text (Text)
 import Data.Typeable
 import Data.Word (Word32)
-import qualified GHC.Exts
 import GHC.Generics
+import GHC.Natural
+import qualified Data.DList as DList
+import qualified GHC.Exts
 
 type ProcName = Text
 
@@ -65,10 +66,13 @@ data Instruction
         elseBranch :: [Instruction]
       }
   | While [Instruction] -- while.true
+  | Repeat Natural [Instruction] -- repeat.count
   | AdvPush (StackIndex 1 16)  -- adv_push.n
   | Push [Felt] -- push.a.b.c
+  | Padw -- padw
   | Swap (StackIndex 1 15) -- swap[.i]
   | Drop -- drop
+  | Dropw -- dropw
   | CDrop -- cdrop
   | Dup (StackIndex 0 15) -- dup.n
   | MoveUp (StackIndex 2 15) -- movup.n
@@ -86,7 +90,9 @@ data Instruction
   | LocStore MemoryIndex -- loc_store.i
   | LocLoad MemoryIndex -- loc_load.i
   | MemLoad (Maybe MemoryIndex) -- mem_load[.i]
+  | MemLoadw (Maybe MemoryIndex) -- mem_loadw[.i]
   | MemStore (Maybe MemoryIndex) -- mem_store[.i]
+  | MemStorew (Maybe MemoryIndex) -- mem_storew[.i]
   | Add (Maybe Felt) -- add[.n]
   | Sub (Maybe Felt) -- sub[.n]
   | Mul (Maybe Felt) -- mul[.n]
