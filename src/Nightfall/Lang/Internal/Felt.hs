@@ -106,7 +106,7 @@ instance Read Felt where
 
 -- | Convert a 'Felt' to the corresponding 'Integer'.
 unFelt :: Felt -> Integer
-unFelt = coerce (toInteger . unMod)
+unFelt = coerce $ toInteger . unMod
 {-# INLINE unFelt #-}
 
 -- See Note [Handling of integral types].

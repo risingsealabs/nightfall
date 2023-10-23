@@ -35,14 +35,14 @@ ppModule m = do
   -- TODO: pretty-print the inputs too, somehow? Even though we don't strictly need that, since
   -- 'runMiden' pretty-prints inputs itself anyway. Maybe at least as a comment in the code or
   -- or something?
-  tell $ DList.fromList $ fmap (("use."++) . unpack) (moduleImports m)
-  traverse_ ppProc . sortProcs $ moduleProcs m
-  ppProgram (moduleProg m)
+  tell $ DList.fromList $ fmap (("use."++) . unpack) (_moduleImports m)
+  traverse_ ppProc . sortProcs $ _moduleProcs m
+  ppProgram (_moduleProg m)
 
 ppProc :: (Text, Proc) -> PpMASM ()
 ppProc (name, p) = do
-  [ "proc." ++ unpack name ++ "." ++ show (procNLocals p) ]
-  indent $ traverse_ ppInstr (procInstrs p)
+  [ "proc." ++ unpack name ++ "." ++ show (_procNLocals p) ]
+  indent $ traverse_ ppInstr (_procInstrs p)
   "end"
 
 ppProgram :: Program -> PpMASM ()

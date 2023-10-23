@@ -32,14 +32,15 @@ library
                       Nightfall
                       Nightfall.Lang.Internal.Felt
                       Nightfall.Lang.Internal.Types
-                      Nightfall.Lang.Types
                       Nightfall.Lang.Syntax.Default
                       Nightfall.Lang.Syntax.DotRecord
+                      Nightfall.Lang.Types
                       Nightfall.MASM
                       Nightfall.MASM.Callgraph
                       Nightfall.MASM.Integral
                       Nightfall.MASM.Miden
                       Nightfall.MASM.Types
+                      Nightfall.Prelude
                       Nightfall.Targets.Miden
     -- other-extensions:
     build-depends:    base >=4.16 && <5
@@ -48,6 +49,7 @@ library
                     , dlist
                     , filepath
                     , free
+                    , lens
                     , mod
                     , mtl
                     , process
@@ -94,6 +96,7 @@ test-suite nightfall-test
         bytestring,
         containers,
         filepath,
+        lens,
         mtl,
         nightfall,
         split,

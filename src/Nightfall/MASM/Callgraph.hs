@@ -7,7 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Nightfall.MASM.Types as M
 
 findCalls :: M.Proc -> [M.ProcName]
-findCalls M.Proc {M.procInstrs} = findCalls' =<< procInstrs
+findCalls M.Proc {M._procInstrs} = findCalls' =<< _procInstrs
 
 findCalls' :: M.Instruction -> [M.ProcName]
 findCalls' (M.Exec name) = [name]

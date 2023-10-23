@@ -1,29 +1,38 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Nightfall.Targets.Miden ( Context(..)
+module Nightfall.Targets.Miden ( dynamicMemoryHead
+                               , Context(..)
                                , defaultContext
                                , Config(..)
                                , defaultConfig
                                , VarInfo(..)
                                , toHashModule
                                , transpile
+                               , cgfTraceVariablesDecl
+                               , cfgTraceVariablesUsage
+                               , varInfoType
+                               , varInfoPos
+                               , progName
+                               , statMemPos
+                               , mayDynMemPtr
+                               , variables
+                               , adviceMapExt
+                               , importExt
+                               , config
                                ) where
 
 import Nightfall.Lang.Internal.Types as NFTypes
 import Nightfall.Lang.Types
-import Nightfall.MASM.Types as MASM
 import Nightfall.MASM.Miden
+import Nightfall.MASM.Types as MASM
+import Nightfall.Prelude
 
-import Control.Monad
+import Control.Lens ((.=), (%=), (?=), use)
 import Control.Monad.State
-import Data.Coerce (coerce)
-import Data.Foldable
-import Data.List (genericLength, singleton)
-import Data.Map.Strict (Map)
-import Data.Monoid
-import Data.Set (Set)
 import Data.Word
 import System.IO.Unsafe
 import qualified Data.Map.Strict as Map
@@ -31,25 +40,14 @@ import qualified Data.Set as Set
 import qualified Data.Text as SText
 import qualified Data.Text as Strict (Text)
 
--- | Applicatively fold a 'Foldable'.
-foldMapA
-    :: forall b m f a. (Monoid b, Applicative m, Foldable f)
-    => (a -> m b)
-    -> f a
-    -> m b
-foldMapA = coerce (foldMap :: (a -> Ap m b) -> f a -> Ap m b)
+dynamicMemoryHead :: Felt
+dynamicMemoryHead = 10000
 
 -- | Transpilation configuration options
 data Config = Config {
-      cgfTraceVariablesDecl :: Bool     -- ^ Whether or not adding comments when declaring variables
-    , cfgTraceVariablesUsage :: Bool    -- ^ Whether or not adding comments when using ("calling") variables
+      _cgfTraceVariablesDecl :: Bool   -- ^ Whether or not adding comments when declaring variables
+    , _cfgTraceVariablesUsage :: Bool  -- ^ Whether or not adding comments when using ("calling") variables
 } deriving (Eq, Show)
-
-defaultConfig :: Config
-defaultConfig = Config
-    { cgfTraceVariablesDecl = False
-    , cfgTraceVariablesUsage = False
-}
 
 data VarInfo = VarInfo
     { _varInfoType :: VarType
@@ -59,25 +57,35 @@ data VarInfo = VarInfo
 -- TODO: a Note about 'adviceMapExt' and 'importExt'.
 -- | Context for the transpilation, this is the state of the State Monad in which transpilation happens
 data Context = Context
-    { progName :: String                   -- ^ Name of the program, for outputs logs, etc.
-    , memPos :: MemoryIndex                -- ^ Next free indice in Miden's global memory
-    , variables :: Map String VarInfo      -- ^ Variables in the EDSL are stored in Miden's random
-                                             -- access memory, we keep a map to match them
-    , adviceMapExt :: Map Strict.Text [MidenWord]  -- ^ Entries to add to the inputs file
-    , importExt :: Set Strict.Text         -- ^ Imports to add to the final program
-    , config :: Config                     -- ^ Transpilation configuration options
+    { _progName :: String                   -- ^ Name of the program, for outputs logs, etc.
+    , _statMemPos :: MemoryIndex            -- ^ Next free indice in Miden's global memory
+    , _mayDynMemPtr :: Maybe MemoryIndex
+    , _variables :: Map String VarInfo      -- ^ Variables in the EDSL are stored in Miden's random
+                                            -- access memory, we keep a map to match them
+    , _adviceMapExt :: Map Strict.Text [MidenWord]  -- ^ Entries to add to the inputs file
+    , _importExt :: Set Strict.Text         -- ^ Imports to add to the final program
+    , _config :: Config                     -- ^ Transpilation configuration options
+    }
+
+$(foldMapA makeLenses [''Context, ''VarInfo, ''Config])
+
+defaultConfig :: Config
+defaultConfig = Config
+    { _cgfTraceVariablesDecl = False
+    , _cfgTraceVariablesUsage = False
     }
 
 defaultContext :: Context
 defaultContext = Context
-    { progName = "<unnamed-program>"
-    , memPos = case toMemoryIndex 0 of
-            Nothing  -> error "Internal error: wrong index for initial memory position"
-            Just pos -> pos
-    , variables = Map.empty
-    , adviceMapExt = Map.empty
-    , importExt = Set.empty
-    , config = defaultConfig
+    { _progName = "<unnamed-program>"
+    , _statMemPos = case toMemoryIndex 0 of
+        Nothing  -> error "Internal error: wrong index for initial memory position"
+        Just pos -> pos
+    , _mayDynMemPtr = Nothing
+    , _variables = Map.empty
+    , _adviceMapExt = Map.empty
+    , _importExt = Set.empty
+    , _config = defaultConfig
     }
 
 toHashModule :: Word32 -> [MidenWord] -> Module
@@ -86,7 +94,7 @@ toHashModule numWords midenWords =
           ["std::mem"]  -- @std::mem@ provides @mem::pipe_words_to_memory@ used above.
           Map.empty
           (Program instrs)
-          (Left $ SecretInputs (midenWords >>= midenWordToList) Map.empty)
+          (Left $ SecretInputs (midenWords >>= midenWordToFelts) Map.empty)
   where
       instrs =
           [ Push [0, fromIntegral numWords]
@@ -109,25 +117,26 @@ toNumWords :: VarType -> Word32
 toNumWords VarFelt              = 1
 toNumWords VarBool              = 1
 toNumWords (VarArrayOfFelt len) = len
+toNumWords VarNat               = 1
+
+staticMaxMemoryIndex :: Integer -> Maybe MemoryIndex
+staticMaxMemoryIndex = toMemoryIndexBelow $ 10 ^ (7 :: Int)
 
 -- | Allocate memory for a variable.
-alloc
-    :: VarName
-    -> VarType
-    -> State Context MemoryIndex
+alloc :: VarName -> VarType -> State Context MemoryIndex
 alloc var varType = do
-    vars <- gets variables
+    vars <- use variables
     if Map.member var vars
         then error $ "Variable '" ++ var ++ "' has already been declared!"
         else do
-            varPos <- gets memPos
+            varPos <- use statMemPos
             let numWords = toNumWords varType
-            modify $ \ctx -> ctx
-                { memPos = case toMemoryIndex $ unMemoryIndex varPos + fromIntegral numWords of
-                    Nothing      -> error "Out of Miden's memory"
-                    Just memPos' -> memPos'
-                , variables = Map.insert var (VarInfo varType varPos) vars
-                }
+                mayStatMemPos' =
+                    staticMaxMemoryIndex $ unMemoryIndex varPos + fromIntegral numWords
+            statMemPos .= case mayStatMemPos' of
+                Nothing          -> error "Out of Miden's memory"
+                Just statMemPos' -> statMemPos'
+            variables .= Map.insert var (VarInfo varType varPos) vars
             pure varPos
 
 -- | Entry point: transpile a EDSL-described ZK program into a Miden Module
@@ -135,13 +144,13 @@ transpile :: ZKProgram -> State Context Module
 transpile zkProg = do
     warning <- foldMapA transpileStatement . runBody $
         comment "This program was generated by Nightfall (https://github.com/qredo/nightfall), avoid editing by hand.\n"
-    modify $ \ctx -> ctx { progName = pName zkProg }
+    progName .= pName zkProg
     midenInstr <- foldMapA transpileStatement . runBody $ pBody zkProg
     ctx <- get
-    return $ Module { moduleImports = Set.toList $ importExt ctx
-                    , moduleProcs = Map.empty -- No procs either (TODO)
-                    , moduleProg = Program (warning ++ midenInstr)
-                    , moduleSecretInputs = case pSecretInputs zkProg of
+    return $ Module { _moduleImports = Set.toList $ _importExt ctx
+                    , _moduleProcs = Map.empty -- No procs either (TODO)
+                    , _moduleProg = Program (warning ++ midenInstr)
+                    , _moduleSecretInputs = case pSecretInputs zkProg of
                         Left inputs -> Left $ inputs
                             { _adviceMap =
                                 Map.unionWithKey
@@ -150,7 +159,7 @@ transpile zkProg = do
                                         , SText.unpack hash
                                         , " occurs twice"
                                         ])
-                                    (adviceMapExt ctx)
+                                    (_adviceMapExt ctx)
                                     (_adviceMap inputs)
                             }
                         -- TODO: no, we're not supposed to ignore inputs that the program needs just
@@ -177,10 +186,11 @@ transpileStatement (NFTypes.While cond body) = do
 
 -- | Declaring a variable loads the expression into Miden's global memory, and we track the index in memory
 transpileStatement (DeclVariable varType var e) = do
-    cfg <- gets config
     varPos <- alloc var varType
     -- Trace the variable declaration if configured
-    let traceVar = [MASM.Comment $ "var " <> SText.pack var | cgfTraceVariablesDecl cfg]
+    traceVar <- do
+        traceDecl <- use $ config . cgfTraceVariablesDecl
+        pure [MASM.Comment $ "var " <> SText.pack var | traceDecl]
     -- Transpile the variable value
     e' <- transpileExpr e
     -- Return instruction for the variable value and instruction to store the value in global memory
@@ -188,8 +198,8 @@ transpileStatement (DeclVariable varType var e) = do
 
 -- | Assigning a new value to a variable if just erasing the memory location
 transpileStatement (AssignVar var e) = do
-    vars <- gets variables
-    shouldTrace <- gets (cfgTraceVariablesUsage . config)
+    vars <- use variables
+    shouldTrace <- use $ config . cfgTraceVariablesUsage
     -- Fetch the memory location for that variable.
     case Map.lookup var vars of
         Nothing -> error $ concat
@@ -204,14 +214,14 @@ transpileStatement (AssignVar var e) = do
             return $ e' <> traceVar <> [ MASM.MemStore . Just $ _varInfoPos varInfo ]
 
 transpileStatement (SetAt arr i val) = do
-    vars <- gets variables
+    vars <- use variables
     case Map.lookup arr vars of
         Nothing -> error $ "variable \"" ++ arr ++ "\" unknown (undeclared)"
         Just varInfo -> do
             unless (isArrayOfFelt $ _varInfoType varInfo) $
                 error $ "'" ++ arr ++ "' is used as an array, but it's not one"
             let arrPos = unMemoryIndex $ _varInfoPos varInfo
-            shouldTrace <- gets (cfgTraceVariablesUsage . config)
+            shouldTrace <- use $ config . cfgTraceVariablesUsage
             let traceVar =
                     [ MASM.Comment $ "an element of '" <> SText.pack arr <> "' number"
                     | shouldTrace
@@ -237,26 +247,20 @@ transpileStatement (NakedCall fname args) = do
 
 transpileStatement (InitArray arr inputs) = do
     let numWords = genericLength inputs
-        inputsAsWords = padListAsWords inputs
+        inputsAsWords = padFeltsAsMidenWords inputs
     arrPos <- alloc arr $ VarArrayOfFelt numWords
     let hash = either error id $ getHash numWords inputsAsWords
-    -- TODO: use @lens@ already.
-    modify $ \ctx -> ctx
-        { -- @std::mem@ provides @mem::pipe_preimage_to_memory@ used below.
-          importExt = Set.insert "std::mem" $ importExt ctx
-        , adviceMapExt =
-            case listToMidenWord hash of
-                Nothing       -> error $ "Panic: a hash is not a Word: " ++ show hash
-                Just hashWord -> Map.insert
-                    (midenWordToHexKey hashWord)
-                    inputsAsWords
-                    (adviceMapExt ctx)
-        }
-    ctx <- get
-    let traceVar =
-            [ MASM.Comment $ "var " <> SText.pack arr
-            | cgfTraceVariablesDecl $ config ctx
-            ]
+    -- @std::mem@ provides @mem::pipe_preimage_to_memory@ used below.
+    importExt %= Set.insert "std::mem"
+    adviceMapExt %= case feltsToMidenWord hash of
+        Nothing       -> error $ "Panic: a hash is not a Word: " ++ show hash
+        Just hashWord -> Map.insert
+            (midenWordToHexKey hashWord)
+            inputsAsWords
+
+    traceVar <- do
+        traceUsage <- use $ config . cfgTraceVariablesUsage
+        pure [MASM.Comment $ "var " <> SText.pack arr | traceUsage]
     pure $ traceVar ++
         [ Push hash
           -- Stack: [Hash, <rest>]
@@ -299,24 +303,55 @@ transpileBinOp LowerEq        = [ MASM.Lte ]
 transpileBinOp Greater        = [ MASM.Gt ]
 transpileBinOp GreaterEq      = [ MASM.Gte ]
 
-transpileLiteral :: Literal -> State Context [Instruction]
-transpileLiteral (LiteralFelt x) = return . singleton $ Push [x]
-transpileLiteral (LiteralBool b) = return . singleton $ Push [if b then 1 else 0]
+transpileLiteral :: Literal -> Felt
+transpileLiteral (LiteralFelt x)        = x
+transpileLiteral (LiteralBool b)        = if b then 1 else 0
+transpileLiteral (LiteralNatPtr natPtr) = natPtr
+
+transpileDynamic :: Dynamic -> State Context [Instruction]
+transpileDynamic (DynamicNat nat) = do
+    let dynPtrName = "__dynPtr"
+    instrsInitDynPtr <- use mayDynMemPtr >>= \case
+        Just _  -> pure []
+        Nothing -> do
+            dynPtr <- use statMemPos
+            mayDynMemPtr ?= dynPtr
+            transpileStatement $ DeclVariable VarFelt dynPtrName . unExpr $ lit dynamicMemoryHead
+    instrsGetDynPtr <- transpileExpr $ Var dynPtrName
+    instrsIncDynPtr <- transpileStatement . AssignVar dynPtrName $
+        BinOp NFTypes.Add (Var dynPtrName) (Literal $ LiteralFelt 1)
+    let natWords = naturalToMidenWords nat
+        instrsSize = concat
+            [ [Push [fromIntegral $ length natWords]]
+            , instrsGetDynPtr
+            , [MemStore Nothing]
+            , instrsIncDynPtr
+            ]
+        instrsLimbs = do
+            mword <- natWords
+            -- TODO: this can be optimized, we don't really need to update 'dynPtr' in memory at
+            -- each iteration.
+            concat
+                [ [Push $ midenWordToFelts mword]
+                , instrsGetDynPtr
+                , [MemStorew Nothing, Dropw]
+                , instrsIncDynPtr
+                ]
+    pure $ instrsInitDynPtr ++ instrsSize ++ instrsLimbs
 
 -- TODO: range check, etc.
 transpileExpr :: Expr_ -> State Context [Instruction]
--- transpileExpr (Lit _) = error "Can't transpile standalone literal" -- should be simply push it to the stack??
--- transpileExpr (Bo _)  = error "Can't transpile standalone boolean"
--- | Literals are simply pushed onto the stack
-transpileExpr (Literal l) = transpileLiteral l
+-- Literals are simply pushed onto the stack
+transpileExpr (Literal l) = return . singleton $ Push [transpileLiteral l]
+transpileExpr (Dynamic d) = transpileDynamic d
 
 transpileExpr (Var varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack
-    vars <- gets variables
+    vars <- use variables
     case Map.lookup varname vars of
         Nothing -> error $ "variable '" ++ varname ++ "' unknown (undeclared)"
         Just varInfo -> do
-            shouldTrace <- gets (cfgTraceVariablesUsage . config)
+            shouldTrace <- use $ config . cfgTraceVariablesUsage
             let traceVar =
                     [ MASM.Comment . SText.pack $ fold
                         ["var ", varname, " (", ppVarType $ _varInfoType varInfo, ")"]
@@ -325,14 +360,14 @@ transpileExpr (Var varname) = do
             return $ traceVar <> [MemLoad . Just $ _varInfoPos varInfo]
 
 transpileExpr (GetAt arr i) = do
-    vars <- gets variables
+    vars <- use variables
     case Map.lookup arr vars of
         Nothing -> error $ "Array variable \"" ++ arr ++ "\" unknown (undeclared)"
         Just varInfo -> do
             unless (isArrayOfFelt $ _varInfoType varInfo) $
                 error $ "'" ++ arr ++ "' is used as an array, but it's not one"
             let arrPos = unMemoryIndex $ _varInfoPos varInfo
-            shouldTrace <- gets (cfgTraceVariablesUsage . config)
+            shouldTrace <- use $ config . cfgTraceVariablesUsage
             let traceVar =
                     [ MASM.Comment $ "an element of '" <> SText.pack arr <> "' number"
                     | shouldTrace

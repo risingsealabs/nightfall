@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -16,19 +17,17 @@ module Nightfall.MASM.Types
     , MemoryIndex
     , unMemoryIndex
     , toMemoryIndex
+    , toMemoryIndexBelow
     , unsafeToMemoryIndex
     ) where
 
 import Nightfall.MASM.Integral
 import Nightfall.Lang.Types
+import Nightfall.Prelude
 
 import Control.Monad.Writer.Strict
-import Data.Map.Strict (Map)
-import Data.String
-import Data.Text (Text)
 import Data.Typeable
 import Data.Word (Word32)
-import GHC.Generics
 import GHC.Natural
 import qualified Data.DList as DList
 import qualified GHC.Exts
@@ -40,17 +39,17 @@ type AdvOpName = Text
 type ModName = Text
 
 data Module = Module
-  { moduleImports :: [ModName],
-    moduleProcs :: Map ProcName Proc,
-    moduleProg :: Program,
+  { _moduleImports :: [ModName],
+    _moduleProcs :: Map ProcName Proc,
+    _moduleProg :: Program,
     -- Please keep in sync with 'ZKProgram'.
-    moduleSecretInputs :: Either SecretInputs FilePath
+    _moduleSecretInputs :: Either SecretInputs FilePath
   }
   deriving (Eq, Ord, Show, Generic, Typeable)
 
 data Proc = Proc
-  { procNLocals :: Int,
-    procInstrs :: [Instruction]
+  { _procNLocals :: Int,
+    _procInstrs :: [Instruction]
   }
   deriving (Eq, Ord, Show, Generic, Typeable)
 
@@ -157,3 +156,5 @@ instance (a ~ ()) => GHC.Exts.IsList (PpMASM a) where
   type Item (PpMASM a) = String
   fromList = tell . DList.fromList
   toList = DList.toList . snd . runWriter . runPpMASM
+
+$(foldMapA makeLenses [''Proc, ''Module])

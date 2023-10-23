@@ -7,11 +7,12 @@
 
 module Nightfall.MASM.Integral where
 
-import GHC.Bits (toIntegralSized)
-import Data.Word (Word8, Word32)
+import Control.Monad
 import Data.Coerce
-import GHC.Generics
 import Data.Typeable
+import Data.Word (Word8, Word32)
+import GHC.Bits (toIntegralSized)
+import GHC.Generics
 import GHC.TypeNats
 
 -- | The type of indices into Miden's stack, each element is greater than or equal to @lower@ and
@@ -67,8 +68,17 @@ unsafeUnMemoryIndex = coerce
 
 -- | Convert an 'Integer' to the corresponding 'MemoryIndex'. Returns 'Nothing' if the integer
 -- doesn't fit into 'MemoryIndex'.
+-- >>> import Data.Word
+-- >>> let m = toInteger (maxBound :: Word32)
+-- >>> map toMemoryIndex [-42, 0, 42, m, m + 1]
+-- [Nothing,Just 0,Just 42,Just 4294967295,Nothing]
 toMemoryIndex :: Integer -> Maybe MemoryIndex
 toMemoryIndex = coerce (toIntegralSized :: Integer -> Maybe Word32)
+
+toMemoryIndexBelow :: Integer -> Integer -> Maybe MemoryIndex
+toMemoryIndexBelow maxExcl n = do
+    guard $ n < maxExcl
+    toMemoryIndex n
 
 -- See Note [Handling of integral types].
 -- | Convert an 'Integer' to the corresponding 'MemoryIndex'. Silently overflows if the integer

@@ -6,7 +6,8 @@ module Nightfall.Lang.Internal.Types
     , feltOrderInteger
     ) where
 
-import Data.String
+import Nightfall.Prelude
+
 import Data.Word
 import GHC.Natural
 import Nightfall.Lang.Internal.Felt
@@ -44,6 +45,7 @@ data VarType =
       VarFelt
     | VarBool
     | VarArrayOfFelt Word32  -- The argument is the length of the array.
+    | VarNat
     deriving (Eq, Show)
 
 -- | Unary operations.
@@ -72,11 +74,18 @@ data BinOp =
 data Literal =
       LiteralFelt Felt
     | LiteralBool Bool
+    | LiteralNatPtr Felt
+    -- TODO: 'LiteralNat'?
+    deriving (Eq, Show)
+
+data Dynamic =
+      DynamicNat Natural
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
 data Expr_ =
       Literal Literal
+    | Dynamic Dynamic
 
     | UnOp UnOp Expr_
     | BinOp BinOp Expr_ Expr_
@@ -126,31 +135,82 @@ ppVarType :: VarType -> String
 ppVarType VarFelt              = "felt"
 ppVarType VarBool              = "bool"
 ppVarType (VarArrayOfFelt len) = "[felt; " ++ show len ++ "]"
+ppVarType VarNat               = "nat"
 
 isArrayOfFelt :: VarType -> Bool
 isArrayOfFelt VarArrayOfFelt{} = True
 isArrayOfFelt _                = False
 
 -- | What Miden considers to be a Word.
-data MidenWord = MidenWord
-    { _midenWord0 :: Felt
-    , _midenWord1 :: Felt
-    , _midenWord2 :: Felt
-    , _midenWord3 :: Felt
-    } deriving (Eq, Ord, Show)
+data MidenWord = MidenWord Felt Felt Felt Felt
+    deriving (Eq, Ord, Show)
 
-midenWordToList :: MidenWord -> [Felt]
-midenWordToList (MidenWord x0 x1 x2 x3) = [x0, x1, x2, x3]
+_midenWord0 :: MidenWord -> Felt
+_midenWord0 (MidenWord x0 _ _ _) = x0
+
+_midenWord1 :: MidenWord -> Felt
+_midenWord1 (MidenWord _ x1 _ _) = x1
+
+_midenWord2 :: MidenWord -> Felt
+_midenWord2 (MidenWord _ _ x2 _) = x2
+
+_midenWord3 :: MidenWord -> Felt
+_midenWord3 (MidenWord _ _ _ x3) = x3
+
+midenWordToFelts :: MidenWord -> [Felt]
+midenWordToFelts (MidenWord x0 x1 x2 x3) = [x0, x1, x2, x3]
 
 -- | Convert a list of 'Felt's into a list of 'MidenWord's by padding each of the 'Felt's with
 -- zeros.
-padListAsWords :: [Felt] -> [MidenWord]
-padListAsWords = map $ \x0 -> MidenWord x0 0 0 0
+padFeltsAsMidenWords :: [Felt] -> [MidenWord]
+padFeltsAsMidenWords = map $ \x0 -> MidenWord x0 0 0 0
 
 -- | Parse a list of 'Felt's as a 'MidenWord'.
-listToMidenWord :: [Felt] -> Maybe MidenWord
-listToMidenWord [x0, x1, x2, x3] = Just $ MidenWord x0 x1 x2 x3
-listToMidenWord _                = Nothing
+feltsToMidenWord :: [Felt] -> Maybe MidenWord
+feltsToMidenWord [x0, x1, x2, x3] = Just $ MidenWord x0 x1 x2 x3
+feltsToMidenWord _                = Nothing
+
+unsafeFeltsToMidenWord :: [Felt] -> MidenWord
+unsafeFeltsToMidenWord = fromMaybe (error "Bad 'MidenWord'") . feltsToMidenWord
+
+-- >>> map (\i -> (i, postpadTo i 'a' "bc")) [0..5]
+-- [(0,"bc"),(1,"bc"),(2,"bc"),(3,"bca"),(4,"bcaa"),(5,"bcaaa")]
+postpadTo :: Int -> a -> [a] -> [a]
+postpadTo n0 xp = go n0 where
+    go 0 xs       = xs
+    go n []       = replicate n xp
+    go n (x : xs) = x : go (n - 1) xs
+
+-- >>> toLeLimbsOf 10 (1 :: Int)
+-- [1]
+-- >>> toLeLimbsOf 10 (23 :: Int)
+-- [3,2]
+-- >>> toLeLimbsOf 10 (5246234 :: Int)
+-- [4,3,2,6,4,2,5]
+toLeLimbsOf :: Integral a => a -> a -> [a]
+toLeLimbsOf limbSize = go where
+    go x
+        | x < limbSize = [x]
+        | otherwise    = limb : go x'
+        where (x', limb) = x `quotRem` limbSize
+
+-- >>> naturalToMidenWords (5 + 2^:64 * 7 + 2^:128 * 2^:32 * 3)
+-- [MidenWord 5 0 7 0,MidenWord 0 3 0 0]
+-- >>> naturalToMidenWords (5 + 2^:64 * 7 + 2^:256 * 2^:32 * 3)
+-- [MidenWord 5 0 7 0,MidenWord 0 0 0 0,MidenWord 0 3 0 0]
+naturalToMidenWords :: Natural -> [MidenWord]
+naturalToMidenWords = map limb128toMidenWord . toLeLimbsOf (2 ^: 128) where
+    limb128toMidenWord =
+        unsafeFeltsToMidenWord . postpadTo 4 0 . map fromIntegral . toLeLimbsOf (2 ^: 32)
+
+-- >>> import Nightfall.Prelude
+-- >>> let n = 5 + 2^:64 * 7 + 2^:256 * 2^:32 * 3
+-- >>> n == midenWordsToNatural (naturalToMidenWords n)
+-- True
+midenWordsToNatural :: [MidenWord] -> Natural
+midenWordsToNatural = sum . zipWith mul (iterate (* 2 ^: 32) 1) . concatMap midenWordToFelts where
+    mul :: Integer -> Felt -> Natural
+    mul x y = fromInteger $ x * unFelt y
 
 {- Note [The encoding of keys in advice_map]
 Encoding of keys in an @advice_map@ happens at
@@ -248,4 +308,4 @@ midenWordToHexKey :: IsString str => MidenWord -> str
 midenWordToHexKey
     = fromString
     . concatMap (printf "%016x" . byteSwap64 . fromIntegral . unsafeUnFelt)
-    . midenWordToList
+    . midenWordToFelts

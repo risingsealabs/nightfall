@@ -49,7 +49,7 @@ displaySecretInputs (SecretInputs advStack advMap) = unlines $ concat
       ]
     ]
   where
-    displayKV hash wrds = show hash ++ ": " ++ show (concatMap midenWordToList wrds)
+    displayKV hash wrds = show hash ++ ": " ++ show (concatMap midenWordToFelts wrds)
 
 runMiden :: KeepFile -> Maybe Word32 -> Module -> IO (Either String [Felt])
 runMiden keep mayNumOutputs m =
@@ -62,7 +62,7 @@ runMiden keep mayNumOutputs m =
         let numOutputsPrefix =
                 maybe [] (\numOutputs -> ["--num-outputs", show numOutputs]) mayNumOutputs
         args <- mappend numOutputsPrefix <$> do
-            let inputsFileOrList = moduleSecretInputs m
+            let inputsFileOrList = _moduleSecretInputs m
             inputsIfAny <- case inputsFileOrList of
                 Left secretInputs -> do
                     hPutStrLn inputsHandle $ displaySecretInputs secretInputs

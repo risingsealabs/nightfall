@@ -18,7 +18,10 @@ module Nightfall.Lang.Types ( Felt
                             , runBody
                             , mkSimpleProgram
                             , mkZKProgram
+                            , IsLiteral(..)
                             , lit
+                            , IsDynamic(..)
+                            , dyn
                             , add
                             , sub
                             , mul
@@ -54,6 +57,7 @@ import Data.Foldable
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Word (Word32)
+import GHC.Natural
 import qualified Data.Map.Strict as Map
 
 -- | Expression wrapper type, typed for safety, exposed to use
@@ -61,17 +65,26 @@ newtype Expr a = Expr
     { unExpr :: Expr_
     } deriving (Eq, Show)
 
-class IsBuiltin a where
+class IsLiteral a where
     literal :: a -> Literal
 
-instance IsBuiltin Felt where
+instance IsLiteral Felt where
     literal = LiteralFelt
 
-instance IsBuiltin Bool where
+instance IsLiteral Bool where
     literal = LiteralBool
 
-lit :: IsBuiltin a => a -> Expr a
+lit :: IsLiteral a => a -> Expr a
 lit = Expr . Literal . literal
+
+class IsDynamic a where
+    dynamic :: a -> Dynamic
+
+instance IsDynamic Natural where
+    dynamic = DynamicNat
+
+dyn :: IsDynamic a => a -> Expr a
+dyn = Expr . Dynamic . dynamic
 
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
 instance a ~ Felt => Num (Expr a) where

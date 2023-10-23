@@ -5,9 +5,12 @@ module Nightfall.Lang.Syntax.Default where
 import Nightfall.Lang.Types
 import Nightfall.Lang.Internal.Types
 
+import GHC.Natural
+
 data DeclType a where
     Felt :: DeclType Felt
     Bool :: DeclType Bool
+    Nat  :: DeclType Natural
 
 data Binding a = Binding
     { _varDeclType :: DeclType a
@@ -23,9 +26,13 @@ instance KnownDeclType Felt where
 instance KnownDeclType Bool where
     knownDeclType = Bool
 
+instance KnownDeclType Natural where
+    knownDeclType = Nat
+
 toVarType :: DeclType a -> VarType
 toVarType Felt = VarFelt
 toVarType Bool = VarBool
+toVarType Nat  = VarNat
 
 declareOf :: DeclType a -> VarName -> Expr a -> Body (Binding a)
 declareOf declType varName expr = do
