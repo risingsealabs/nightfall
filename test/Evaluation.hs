@@ -33,7 +33,7 @@ instance Arbitrary MidenWord where
 
 evalZKProgram :: ZKProgram -> IO (Either String [Felt])
 evalZKProgram prog = do
-    let (masm, _) = runState (transpile prog) defaultContext
+    let (masm, _) = runState (transpileZKProgram prog) defaultContext
     runMiden DontKeep Nothing masm
 
 test_initGet :: TestTree
@@ -156,7 +156,7 @@ test_setNatural =
                 prog = mkSimpleProgram "setNatural" $
                     for_ (zip [0 :: Int ..] nats) $ \(i, n) ->
                         statement . DeclVariable VarNat ("n" ++ show i) . unExpr $ dyn n
-                (masm, _) = runState (transpile prog) defaultContext
+                (masm, _) = runState (transpileZKProgram prog) defaultContext
                 offset = dynamicMemoryHead +
                     sum (map (succ . genericLength . naturalToMidenWords) $ take target nats)
                 midenWords = naturalToMidenWords $ nats !! target

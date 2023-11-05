@@ -45,11 +45,11 @@ main = do
                 examples = unlines . Prelude.map ("    "++) . Map.keys $ allProgs
             error $ str ++ examples
         Just prog -> do
-            let cfg = defaultConfig { cgfTraceVariablesDecl = True
-                                    , cfgTraceVariablesUsage = True
+            let cfg = defaultConfig { _cgfTraceVariablesDecl = True
+                                    , _cfgTraceVariablesUsage = True
                                     }
-                context = defaultContext { config = cfg }
-            let (midenProg, _) = runState (transpile prog) context
+                context = defaultContext { _config = cfg }
+            let (midenProg, _) = runState (transpileZKProgram prog) context
             return midenProg
 
     -- Check if the user provided a path to write the program

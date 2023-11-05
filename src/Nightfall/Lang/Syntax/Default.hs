@@ -34,19 +34,19 @@ toVarType Felt = VarFelt
 toVarType Bool = VarBool
 toVarType Nat  = VarNat
 
-declareOf :: DeclType a -> VarName -> Expr a -> Body (Binding a)
+declareOf :: DeclType a -> VarName -> Expr asm a -> Body asm (Binding a)
 declareOf declType varName expr = do
     statement . DeclVariable (toVarType declType) varName $ unExpr expr
     pure $ Binding declType varName
 
-declare :: KnownDeclType a => VarName -> Expr a -> Body (Binding a)
+declare :: KnownDeclType a => VarName -> Expr asm a -> Body asm (Binding a)
 declare = declareOf knownDeclType
 
-get :: Binding a -> Expr a
+get :: Binding a -> Expr asm a
 get (Binding _ name) = Expr $ Var name
 
-set :: Binding a -> Expr a -> Body ()
+set :: Binding a -> Expr asm a -> Body asm ()
 set var expr = statement $ AssignVar (_varName var) (unExpr expr)
 
-mut :: Binding a -> (Expr a -> Expr a) -> Body ()
+mut :: Binding a -> (Expr asm a -> Expr asm a) -> Body asm ()
 mut var f = set var . f $ get var

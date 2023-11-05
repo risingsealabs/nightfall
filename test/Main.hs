@@ -78,7 +78,7 @@ test_examplesGolden =
                     , _cfgTraceVariablesUsage = True
                     }
                 }
-            (masm, _) = runState (transpile prog) context
+            (masm, _) = runState (transpileZKProgram prog) context
             name = filter isAlphaNum $ pName prog
             path = "test" </> "golden" </> name
         in testGroup name $

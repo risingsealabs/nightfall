@@ -62,6 +62,7 @@ data BinOp =
     | Mul     -- ^ @a * b@
     | Div     -- ^ @a / b@ (integer division)
     | IDiv32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
+    | AddNat
 
     -- Boolean operations
     | Equal      -- ^ @a == b@
@@ -83,46 +84,46 @@ data Dynamic =
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
-data Expr_ =
+data Expr_ asm =
       Literal Literal
     | Dynamic Dynamic
 
-    | UnOp UnOp Expr_
-    | BinOp BinOp Expr_ Expr_
+    | UnOp UnOp (Expr_ asm)
+    | BinOp BinOp (Expr_ asm) (Expr_ asm)
 
     | Var VarName
 
-    | GetAt VarName Expr_
+    | GetAt VarName (Expr_ asm)
 
     -- | Functions
-    | FCall FunName [Expr_]
+    | FCall FunName [Expr_ asm]
 
     -- | Secret Input
     | NextSecret       -- ^ The next available secret input
     deriving (Eq, Show)
 
 -- | Simple, internal type, not exposed
-data Statement_ =
+data Statement_ asm =
     -- | Variable declaration
-      DeclVariable VarType VarName Expr_  -- ^ let a = 634
+      DeclVariable VarType VarName (Expr_ asm)  -- ^ let a = 634
     
     -- | Variable assignment
-    | AssignVar VarName Expr_     -- ^ a <- 368
+    | AssignVar VarName (Expr_ asm)     -- ^ a <- 368
 
-    | SetAt VarName Expr_ Expr_
+    | SetAt VarName (Expr_ asm) (Expr_ asm)
 
     -- | Conditionals
-    | IfElse Expr_ [Statement_] [Statement_] -- ^ condition if-block else-block
-    | Repeat Natural [Statement_]
-    | While Expr_ [Statement_]               -- ^ condition body
+    | IfElse (Expr_ asm) [Statement_ asm] [Statement_ asm] -- ^ condition if-block else-block
+    | Repeat Natural [Statement_ asm]
+    | While (Expr_ asm) [Statement_ asm]               -- ^ condition body
 
     -- | Naked function call
-    | NakedCall FunName [Expr_]
+    | NakedCall FunName [Expr_ asm]
 
     | InitArray VarName [Felt]
 
     -- | Return
-    | Return Expr_
+    | Return (Expr_ asm)
 
     -- | Comment
     | Comment String
