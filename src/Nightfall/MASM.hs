@@ -111,6 +111,7 @@ ppInstr IMul = "u32wrapping_mul"
 ppInstr IDiv = "u32checked_div"
 ppInstr IMod = "u32checked_mod"
 ppInstr (IDivMod mk) = [ "u32checked_divmod" ++ maybe "" (\k -> "." ++ show k) mk ]
+ppInstr IMax = "u32checked_max"
 ppInstr IShL = "u32checked_shl"
 ppInstr IShR = "u32checked_shr"
 ppInstr (IEq mk) = [ "u32checked_eq" ++ maybe "" (\k -> "." ++ show k) mk ]

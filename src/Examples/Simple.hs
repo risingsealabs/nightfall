@@ -15,7 +15,7 @@ module Examples.Simple ( trivial1Prog
 import Nightfall.Lang.Syntax.Default
 import Nightfall.Lang.Types
 import Nightfall.Prelude
-import Nightfall.Targets.Miden
+-- import Nightfall.Targets.Miden
 
 -- * Simplest, most trivial program that adds to fixed numbers, no variable, no inputs (public or secret)
 
@@ -183,10 +183,16 @@ simpleInitArray = mkSimpleProgram "simple initArray" $ do
     comment "arr[1] + oldArrAt3 + arr[3] + arr[4] = 0 + 885 + 1 + 4 = 890"
     ret $ getAt "arr" 1 + get oldArrAt3 + getAt "arr" 3 + getAt "arr" 4
 
+-- simpleNat :: ZKProgram
+-- simpleNat = mkSimpleProgram "simple nat" $ do
+--     initArray "fakeArr" []
+--     _ <- declareOf Nat "n" . dyn $ 5 + 2^:64 * 7 + 2^:128 * 3
+--     comment "n[0] + n[1] = 5 + 3 = 8"
+--     let getLimbAt i = getAt "fakeArr" (lit $ dynamicMemoryHead + i + 1)
+--     ret $ getLimbAt 0 + getLimbAt 1
+
 simpleNat :: ZKProgram
 simpleNat = mkSimpleProgram "simple nat" $ do
     initArray "fakeArr" []
-    _ <- declareOf Nat "n" . dyn $ 5 + 2^:64 * 7 + 2^:128 * 3
-    comment "n[0] + n[1] = 5 + 3 = 8"
-    let getLimbAt i = getAt "fakeArr" (lit $ dynamicMemoryHead + i + 1)
-    ret $ getLimbAt 0 + getLimbAt 1
+    n <- declareOf Nat "n" . dyn $ 5 + 2^:64 * 7 + 2^:128 * 3
+    ret $ binOp AddNat (get n) (get n)

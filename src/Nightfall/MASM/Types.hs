@@ -103,6 +103,7 @@ data Instruction
   | IDiv -- u32checked_div
   | IMod -- u32checked_mod
   | IDivMod (Maybe Word32) -- u32checked_divmod
+  | IMax
   | IShL
   | IShR -- u32checked_{shl, shr}
   | IAnd

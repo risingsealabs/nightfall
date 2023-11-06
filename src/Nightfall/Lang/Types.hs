@@ -22,11 +22,14 @@ module Nightfall.Lang.Types ( Felt
                             , lit
                             , IsDynamic(..)
                             , dyn
+                            , assembly
+                            , binOp
                             , add
                             , sub
                             , mul
                             , div'
                             , idiv32
+                            , BinOp (AddNat)
                             , eq
                             , not'
                             , lt
@@ -149,12 +152,16 @@ mkZKProgram name body pubs secretFP = ZKProgram
 -- * "Smart Constructors" for building (type-safe) @Expr. They are the ones exposed for users to use
 -- instead of constructing the types directly.
 
--- ** Literals
+assembly :: asm -> Expr asm a
+assembly = Expr . Assembly
+
+binOp :: BinOp -> Expr asm a -> Expr asm b -> Expr asm c
+binOp op (Expr e1) (Expr e2) = Expr $ BinOp op e1 e2
 
 -- ** Arithmetic operations
 
 add :: Expr asm Felt -> Expr asm Felt -> Expr asm Felt
-add  (Expr e1) (Expr e2) = Expr $ BinOp Add e1 e2
+add = binOp Add
 
 sub :: Expr asm Felt -> Expr asm Felt -> Expr asm Felt
 sub (Expr e1) (Expr e2) = Expr $ BinOp Sub e1 e2

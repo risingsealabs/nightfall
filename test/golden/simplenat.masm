@@ -8,9 +8,11 @@ begin
   push.0.0
   exec.mem::pipe_preimage_to_memory
   drop
-  push.10000
+  push.1000000
   # var __dynPtr
   mem_store.1
+  # var __dynPtr (felt)
+  mem_load.1
   push.2
   # var __dynPtr (felt)
   mem_load.1
@@ -45,12 +47,50 @@ begin
   mem_store.1
   # var n
   mem_store.0
-  # n[0] + n[1] = 5 + 3 = 8
-  # an element of 'fakeArr' number
-  push.10001
+  # var n (nat)
+  mem_load.0
+  # var n (nat)
+  mem_load.0
+  # var y
+  mem_store.2
+  # var x
+  mem_store.3
+  push.0
+  # var i
+  mem_store.4
+  # var x (felt)
+  mem_load.3
   mem_load
-  # an element of 'fakeArr' number
-  push.10002
+  # var y (felt)
+  mem_load.2
   mem_load
-  add
+  u32checked_max
+  # var counter
+  mem_store.5
+  # var counter (felt)
+  mem_load.5
+  push.0
+  eq
+  not
+  while.true
+    # var i (felt)
+    mem_load.4
+    push.1
+    add
+    # var i
+    mem_store.4
+    # var counter (felt)
+    mem_load.5
+    push.1
+    sub
+    # var counter
+    mem_store.5
+    # var counter (felt)
+    mem_load.5
+    push.0
+    eq
+    not
+  end
+  # var i (felt)
+  mem_load.4
 end

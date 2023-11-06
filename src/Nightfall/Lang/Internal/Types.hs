@@ -62,6 +62,7 @@ data BinOp =
     | Mul     -- ^ @a * b@
     | Div     -- ^ @a / b@ (integer division)
     | IDiv32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
+    | IMax32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
     | AddNat
 
     -- Boolean operations
@@ -85,7 +86,8 @@ data Dynamic =
 
 -- | Expression, internal type, not exposed
 data Expr_ asm =
-      Literal Literal
+      Assembly asm
+    | Literal Literal
     | Dynamic Dynamic
 
     | UnOp UnOp (Expr_ asm)
