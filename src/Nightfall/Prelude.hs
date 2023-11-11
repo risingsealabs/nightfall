@@ -62,6 +62,11 @@ foldMapA
     => (a -> m b) -> f a -> m b
 foldMapA = coerce (foldMap :: (a -> Ap m b) -> f a -> Ap m b)
 
+foldA
+    :: forall a m f. (Monoid a, Applicative m, Foldable f)
+    => f (m a) -> m a
+foldA = foldMapA id
+
 foldFor
     :: forall b m f a. (Monoid b, Applicative m, Foldable f)
     => f a -> (a -> m b) -> m b

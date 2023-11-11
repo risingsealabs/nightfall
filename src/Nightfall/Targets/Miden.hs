@@ -14,8 +14,8 @@ module Nightfall.Targets.Miden ( dynamicMemoryHead
                                , Config(..)
                                , defaultConfig
                                , VarInfo(..)
-                               , assemblyPostM
-                               , assemblyPost
+                               , decorateM
+                               , decorate
                                , toHashModule
                                , transpileZKProgram
                                , Transpile(..)
@@ -313,26 +313,26 @@ transpileUnOp :: UnOp -> [Instruction]
 transpileUnOp NFTypes.Not   = [ MASM.Not   ]
 transpileUnOp NFTypes.IsOdd = [ MASM.IsOdd ]
 
-assemblyPostM :: asm ~ State Context [Instruction] => Expr asm a -> asm -> Expr asm b
-assemblyPostM expr asm = assembly $ (++) <$> transpile expr <*> asm
+decorateM
+    :: asm ~ State Context [Instruction]
+    => asm -> Expr asm a -> asm -> Expr asm b
+decorateM asmPre expr asmPost = assembly $ foldA [asmPre, transpile expr, asmPost]
 
-assemblyPost :: asm ~ State Context [Instruction] => Expr asm a -> [Instruction] -> Expr asm b
-assemblyPost expr = assemblyPostM expr . pure
+decorate
+    :: asm ~ State Context [Instruction]
+    => [Instruction] -> Expr asm a -> [Instruction] -> Expr asm b
+decorate asmPre expr asmPost = decorateM (pure asmPre) expr (pure asmPost)
 
-deref :: Syntax.Binding Felt -> Expr (State Context [Instruction]) Felt
-deref ptr = assemblyPost (Syntax.get ptr) [MemLoad Nothing]
+deref :: asm ~ (State Context [Instruction])  => Expr asm Felt -> Expr asm Felt
+deref ptr = decorate [] ptr [MemLoad Nothing]
 
-derefw :: Syntax.Binding Felt -> Expr (State Context [Instruction]) MidenWord
-derefw ptr = assemblyPost (Syntax.get ptr) [MemLoadw Nothing]
+derefw :: asm ~ (State Context [Instruction]) => Expr asm Felt -> Expr asm MidenWord
+derefw ptr = decorate [Padw] ptr [MemLoadw Nothing]
 
--- alloc c[{n}]
--- set carry 0
--- set i 0
--- push (u32max a.size b.size)
--- repeat
---   set rci $ a[i] `unchecked_add256` b[i] `unchecked_add256` carry
---   set carry $ div128 rci
---   setAt c i $ mod128 rci
+data Word256
+
+deref256 :: asm ~ (State Context [Instruction])  => Expr asm Felt -> Expr asm Word256
+deref256 ptr = decorate [] (derefw ptr) [Padw]
 
 -- | Transpile a binary operation.
 transpileBinOp :: BinOp -> State Context [Instruction]
@@ -349,35 +349,22 @@ transpileBinOp NFTypes.Add256 = do
 transpileBinOp NFTypes.AddNat = transpile $ do
     yPtr <- Syntax.declare "y" . assembly $ pure []
     xPtr <- Syntax.declare "x" . assembly $ pure []
-    -- carry <- Syntax.declare "carry" 0
-    -- i <- Syntax.declare "i" 0
-    -- repeatDynamic (binOp IMax32 (deref xPtr) (deref yPtr)) $ do
-    ret $ binOp Add256
-        (assemblyPost (derefw xPtr) [Padw])
-        (assemblyPost (derefw yPtr) [Padw])
-        -- Syntax.set i $ Syntax.get i + 1
-    -- ret $ Syntax.get i
+    ySize <- Syntax.declare "ySize" . deref $ Syntax.get yPtr
+    xSize <- Syntax.declare "xSize" . deref $ Syntax.get xPtr
+    i <- Syntax.declare "i" 0
+    ret . assembly $ pure [Padw]  -- @carry@
+    repeatDynamic (binOp IMax32 (Syntax.get xSize) (Syntax.get ySize)) $ do
+        Syntax.set i $ Syntax.get i + 1
+        ret . assembly $ pure [Padw]
+        simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get xSize)) $
+           ret . binOp Add256 (deref256 $ Syntax.get xPtr + Syntax.get i) . assembly $ pure []
+        simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get ySize)) $
+           ret . binOp Add256 (deref256 $ Syntax.get yPtr + Syntax.get i) . assembly $ pure []
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
 transpileBinOp Lower          = pure [MASM.Lt]
 transpileBinOp LowerEq        = pure [MASM.Lte]
 transpileBinOp Greater        = pure [MASM.Gt]
 transpileBinOp GreaterEq      = pure [MASM.Gte]
-
--- repeatDynamic :: Expr asm Felt -> Body asm () -> Body asm ()
--- repeatDynamic count body = do
---     counter <- Syntax.declare "counter" count
---     while (not' $ Syntax.get counter `eq` 0) $ do
---         body
---         Syntax.set counter $ Syntax.get counter - 1
-
--- alloc c[{n}]
--- set carry 0
--- set i 0
--- push (u32max a.size b.size)
--- repeat
---   set rci $ a[i] `unchecked_add256` b[i] `unchecked_add256` carry
---   set carry $ div128 rci
---   setAt c i $ mod128 rci
 
 transpileLiteral :: Literal -> Felt
 transpileLiteral (LiteralFelt x)        = x
