@@ -194,5 +194,6 @@ simpleInitArray = mkSimpleProgram "simple initArray" $ do
 simpleNat :: ZKProgram
 simpleNat = mkSimpleProgram "simple nat" $ do
     -- initArray "fakeArr" []
-    n <- declareOf Nat "n" . dyn $ 31 + 2^:64 * 120 + 2^:256 * 7
-    ret $ binOp AddNat (get n) (get n)
+    n <- declareOf Nat "n" . dyn $ 31 + 2^:64 * 120 + 2^:256 * 7 + 2^:384 * 17
+    m <- declareOf Nat "m" . dyn $ 4
+    ret $ binOp AddNat (get n) (get m)

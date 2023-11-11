@@ -145,7 +145,7 @@ instance Arbitrary HugeNatural where
             pure $ 2 ^ powerOf2 * coeff
         pure . HugeNatural . fromIntegral $ sum addendums
 
-    shrink = map (HugeNatural . fromInteger) . shrink . toInteger . unHugeNatural
+    -- shrink = map (HugeNatural . fromInteger) . shrink . toInteger . unHugeNatural
 
 test_naturalToMidenWords :: TestTree
 test_naturalToMidenWords =
@@ -201,6 +201,22 @@ test_addLimbs =
                     let expected = midenWordsToNatural [mword1] + midenWordsToNatural [mword2]
                     pure $ expected === feltsToNatural (reverse outputs)
 
+test_addNats :: TestTree
+test_addNats =
+    let name = "addNats"
+    in testProperty name . withMaxSuccess 70 $ \(HugeNatural nat1) (HugeNatural nat2) ->
+        monadicIO $ do
+            let prog = mkSimpleProgramAsm name $ do
+                    ret $ binOp AddNat (dyn nat1) (dyn nat2)
+                    ret $ assembly loadNat
+                numLimbs = max (length $ naturalToMidenWords nat1) (length $ naturalToMidenWords nat2) + 1
+            errOrRes <- liftIO $ evalZKProgram (Just $ fromIntegral numLimbs * 4) prog
+            case errOrRes of
+                Left err      -> error err
+                Right outputs -> do
+                    let expected = nat1 + nat2
+                    pure $ expected === feltsToNatural (reverse outputs)
+
 test_evaluation :: TestTree
 test_evaluation =
     testGroup "Evaluation"
@@ -211,4 +227,5 @@ test_evaluation =
         , test_naturalToMidenWords
         , test_setNatural
         , test_addLimbs
+        , test_addNats
         ]

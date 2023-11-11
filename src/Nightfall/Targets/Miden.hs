@@ -16,6 +16,8 @@ module Nightfall.Targets.Miden ( dynamicMemoryHead
                                , VarInfo(..)
                                , decorateM
                                , decorate
+                               , onStack
+                               , loadNat
                                , toHashModule
                                , transpileZKProgram
                                , Transpile(..)
@@ -50,6 +52,9 @@ import qualified Data.Text as Strict (Text)
 
 dynamicMemoryHead :: Felt
 dynamicMemoryHead = 1000000
+
+dynPtrName :: VarName
+dynPtrName = "__dynPtr"
 
 -- | Transpilation configuration options
 data Config = Config {
@@ -156,9 +161,9 @@ alloc var varType = do
 -- > while (counter /= 0)
 -- >   body
 -- >   counter = counter - 1
-repeatDynamic :: Expr asm Felt -> Body asm () -> Body asm ()
-repeatDynamic count body = do
-    counter <- Syntax.declare "counter" count
+repeatDynamic :: VarName -> Expr asm Felt -> Body asm () -> Body asm ()
+repeatDynamic counterName count body = do
+    counter <- Syntax.declare counterName count
     while (not' $ Syntax.get counter `eq` 0) $ do
         body
         Syntax.set counter $ Syntax.get counter - 1
@@ -323,16 +328,26 @@ decorate
     => [Instruction] -> Expr asm a -> [Instruction] -> Expr asm b
 decorate asmPre expr asmPost = decorateM (pure asmPre) expr (pure asmPost)
 
-deref :: asm ~ (State Context [Instruction])  => Expr asm Felt -> Expr asm Felt
+deref :: asm ~ State Context [Instruction]  => Expr asm Felt -> Expr asm Felt
 deref ptr = decorate [] ptr [MemLoad Nothing]
 
-derefw :: asm ~ (State Context [Instruction]) => Expr asm Felt -> Expr asm MidenWord
+derefw :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm MidenWord
 derefw ptr = decorate [Padw] ptr [MemLoadw Nothing]
 
 data Word256
 
-deref256 :: asm ~ (State Context [Instruction])  => Expr asm Felt -> Expr asm Word256
+deref256 :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm Word256
 deref256 ptr = decorate [] (derefw ptr) [Padw]
+
+onStack :: Expr (State Context [Instruction]) a
+onStack = assembly $ pure []
+
+loadNat :: State Context [Instruction]
+loadNat = transpile $ do
+    natPtr <- Syntax.declare "natPtr2" onStack
+    repeatDynamic "counter3" (deref $ Syntax.get natPtr) $ do
+        Syntax.set natPtr $ Syntax.get natPtr + 1
+        ret . derefw $ Syntax.get natPtr
 
 -- | Transpile a binary operation.
 transpileBinOp :: BinOp -> State Context [Instruction]
@@ -347,19 +362,40 @@ transpileBinOp NFTypes.Add256 = do
     importExt %= Set.insert "std::math::u256"
     pure [MASM.IAdd256]
 transpileBinOp NFTypes.AddNat = transpile $ do
-    yPtr <- Syntax.declare "y" . assembly $ pure []
-    xPtr <- Syntax.declare "x" . assembly $ pure []
+    yPtr <- Syntax.declare "yPtr" onStack
+    xPtr <- Syntax.declare "xPtr" onStack
     ySize <- Syntax.declare "ySize" . deref $ Syntax.get yPtr
     xSize <- Syntax.declare "xSize" . deref $ Syntax.get xPtr
-    i <- Syntax.declare "i" 0
+    i <- Syntax.declare "i" 1
     ret . assembly $ pure [Padw]  -- @carry@
-    repeatDynamic (binOp IMax32 (Syntax.get xSize) (Syntax.get ySize)) $ do
-        Syntax.set i $ Syntax.get i + 1
+    repeatDynamic "counter1" (binOp IMax32 (Syntax.get xSize) (Syntax.get ySize)) $ do
         ret . assembly $ pure [Padw]
         simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get xSize)) $
-           ret . binOp Add256 (deref256 $ Syntax.get xPtr + Syntax.get i) . assembly $ pure []
+           ret $ binOp Add256 (deref256 $ Syntax.get xPtr + Syntax.get i) onStack
         simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get ySize)) $
-           ret . binOp Add256 (deref256 $ Syntax.get yPtr + Syntax.get i) . assembly $ pure []
+           ret $ binOp Add256 (deref256 $ Syntax.get yPtr + Syntax.get i) onStack
+        Syntax.set i $ Syntax.get i + 1
+    -- TODO: use @eqw@ to drop the last word if it's zero?
+    let dynPtr = Syntax.Binding Syntax.Felt dynPtrName
+    elPtr <- Syntax.declare "elPtr" $ Syntax.get dynPtr + Syntax.get i
+    Syntax.set dynPtr $ Syntax.get elPtr + 1
+    repeatDynamic "counter2" (Syntax.get i) $ do
+        ret $ Syntax.get elPtr
+        ret . assembly $ pure [MemStorew Nothing, Dropw]
+        Syntax.set elPtr $ Syntax.get elPtr - 1
+    ret $ Syntax.get i
+    ret $ Syntax.get elPtr
+    ret . assembly $ pure [MemStore Nothing]
+    ret $ Syntax.get elPtr
+    -- ret $ assembly loadNat
+    -- -- ret . assembly $ pure [MemLoad . Just . unsafeToMemoryIndex $ unFelt dynamicMemoryHead]
+    -- ret . assembly $ pure [MemLoadw . Just . unsafeToMemoryIndex $ unFelt dynamicMemoryHead + 4]
+
+-- 3 words: [24, 31, 1]
+-- i = 3
+-- dynPtr -> 10000
+-- dynPtr' -> 10004
+
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
 transpileBinOp Lower          = pure [MASM.Lt]
 transpileBinOp LowerEq        = pure [MASM.Lte]
@@ -373,7 +409,6 @@ transpileLiteral (LiteralNatPtr natPtr) = natPtr
 
 transpileDynamic :: Dynamic -> State Context [Instruction]
 transpileDynamic (DynamicNat nat) = do
-    let dynPtrName = "__dynPtr"
     instrsInitDynPtr <- use mayDynMemPtr >>= \case
         Just _  -> pure []
         Nothing -> do

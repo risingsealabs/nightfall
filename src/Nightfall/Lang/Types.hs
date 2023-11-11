@@ -5,7 +5,8 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Nightfall.Lang.Types ( Felt
-                            , MidenWord(..)
+                            , MidenWordOf(..)
+                            , MidenWord
                             , VarName
                             , FunName
                             , Statement_
