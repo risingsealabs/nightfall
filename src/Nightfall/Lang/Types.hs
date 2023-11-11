@@ -10,12 +10,14 @@ module Nightfall.Lang.Types ( Felt
                             , FunName
                             , Statement_
                             , Expr(..)
-                            , ZKProgram(..)
+                            , ZKProgramAsm(..)
+                            , ZKProgram
                             , BodyF(..)
                             , Body(..)
                             , SecretInputs(..)
                             , emptySecretInputs
                             , runBody
+                            , mkSimpleProgramAsm
                             , mkSimpleProgram
                             , mkZKProgram
                             , IsLiteral(..)
@@ -117,10 +119,10 @@ data SecretInputs = SecretInputs
 emptySecretInputs :: SecretInputs
 emptySecretInputs = SecretInputs [] Map.empty
 
-data ZKProgram = ZKProgram
+data ZKProgramAsm asm = ZKProgram
     { pName :: String
       -- ^ Program name, useful for tests.
-    , pBody :: Body Void ()
+    , pBody :: Body asm ()
       -- ^ List of statements comprising the program
     , pPublicInputs :: [Felt]
       -- ^ Defining the public inputs as a list of field elements for now
@@ -131,14 +133,19 @@ data ZKProgram = ZKProgram
       -- TODO: is there a reason to merge public and secret inputs into a single data type?
     }
 
+type ZKProgram = ZKProgramAsm Void
+
 -- | Helper to quickly make a simple @ZKProgram@ from a list of statements, no inputs
-mkSimpleProgram :: String -> Body Void () -> ZKProgram
-mkSimpleProgram name body = ZKProgram
+mkSimpleProgramAsm :: String -> Body asm () -> ZKProgramAsm asm
+mkSimpleProgramAsm name body = ZKProgram
     { pName = name
     , pBody = body
     , pPublicInputs = []
     , pSecretInputs = Left emptySecretInputs
     }
+
+mkSimpleProgram :: String -> Body Void () -> ZKProgram
+mkSimpleProgram = mkSimpleProgramAsm
 
 -- | Helper to build a @ZKProgram@.
 mkZKProgram :: String -> Body Void () -> [Felt] -> FilePath -> ZKProgram

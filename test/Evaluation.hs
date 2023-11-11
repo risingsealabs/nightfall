@@ -26,15 +26,26 @@ instance Arbitrary Felt where
     arbitrary = fromInteger <$> arbitrary
     shrink = map fromInteger . shrink . unFelt
 
-instance Arbitrary MidenWord where
+instance Arbitrary a => Arbitrary (MidenWordOf a) where
     arbitrary = MidenWord <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
     shrink (MidenWord x0 x1 x2 x3) =
         shrink (x0, x1, x2, x3) <&> \(x0', x1', x2', x3') -> MidenWord x0' x1' x2' x3'
 
-evalZKProgram :: ZKProgram -> IO (Either String [Felt])
-evalZKProgram prog = do
+newtype Limb = Limb
+    { unLimb :: MidenWord
+    }
+
+instance Show Limb where
+    show = show . unLimb
+
+instance Arbitrary Limb where
+    arbitrary = Limb . fmap (fromIntegral @Word32) <$> arbitrary
+    shrink = map Limb . shrink . unLimb
+
+evalZKProgram :: Transpile asm => Maybe Word32 -> ZKProgramAsm asm -> IO (Either String [Felt])
+evalZKProgram keep prog = do
     let (masm, _) = runState (transpileZKProgram prog) defaultContext
-    runMiden DontKeep Nothing masm
+    runMiden DontKeep keep masm
 
 test_initGet :: TestTree
 test_initGet =
@@ -42,16 +53,16 @@ test_initGet =
     in testProperty name $ \(m :: Word8) -> withMaxSuccess 30 . monadicIO $ do
         -- Pick an arbitrary valid index in the array.
         i <- pick $ chooseBoundedIntegral (0, m)
-        errOrRes <- liftIO . evalZKProgram . mkSimpleProgram name $ do
+        errOrRes <- liftIO . evalZKProgram (Just 1) . mkSimpleProgram name $ do
             -- Initialize @arr@.
             initArray "arr" [0 .. fromIntegral m]
             -- Get the element at the @i@th index.
             ret $ getAt "arr" $ fromIntegral i
         case errOrRes of
-            Left err       -> fail err
-            Right []       -> fail "'runMiden' returned an empty stack"
+            Left err -> fail err
             -- The looked up element must be equal to the index of the element.
-            Right (i' : _) -> pure $ fromIntegral i === i'
+            Right [i'] -> pure $ fromIntegral i === i'
+            Right _ -> fail "Wrong number of outputs"
 
 test_initSetGet :: TestTree
 test_initSetGet =
@@ -67,7 +78,7 @@ test_initSetGet =
         -- Pick @x@ such that it's definitely not equal to any of the elements in the array by being
         -- greater than any of them.
         x <- pick $ (fromIntegral (maxBound :: Word8) +) . fromIntegral . succ <$> arbitrary @Word32
-        errOrRes <- liftIO . evalZKProgram . mkSimpleProgram name $ do
+        errOrRes <- liftIO . evalZKProgram (Just 1) . mkSimpleProgram name $ do
             -- Initialize @arr@.
             initArray "arr" [0 .. fromIntegral m]
             -- Change the element at the @i@th index.
@@ -75,13 +86,13 @@ test_initSetGet =
             -- Get the element at the @j@th index.
             ret $ getAt "arr" $ fromIntegral j
         case errOrRes of
-            Left err      -> fail err
-            Right []      -> fail "'runMiden' returned an empty stack"
-            Right (y : _) ->
+            Left err -> fail err
+            Right [y] ->
                 -- If @i@ and @j@ are equal, then we looked up the updated element and it has to be
                 -- equal to @x@. Otherwise, it must be some initial element that cannot be equal to
                 -- @x@.
                 pure $ if i == j then x === y else fromIntegral j === y .&&. x =/= y
+            Right _ -> fail "Wrong number of outputs"
 
 test_initLoadAll :: TestTree
 test_initLoadAll =
@@ -153,7 +164,7 @@ test_setNatural =
         forAllShrink (chooseInt (0, natsLen - 1)) shrink $ \target ->
         forAllShrink (vectorOf natsLen arbitrary) shrinkOne $ \hugeNats -> do
             let nats = map unHugeNatural hugeNats
-                prog = mkSimpleProgram "setNatural" $
+                prog = mkSimpleProgram name $
                     for_ (zip [0 :: Int ..] nats) $ \(i, n) ->
                         statement . DeclVariable VarNat ("n" ++ show i) . unExpr $ dyn n
                 (masm, _) = runState (transpileZKProgram prog) defaultContext
@@ -174,6 +185,22 @@ test_setNatural =
                         Right outputs -> pure $ midenWordToFelts midenWord === reverse outputs
             conjoin $ propSize : propLimbs
 
+test_addLimbs :: TestTree
+test_addLimbs =
+    let name = "addLimbs"
+    in testProperty name . withMaxSuccess 110 $ \(Limb mword1) (Limb mword2) ->
+        monadicIO $ do
+            let prog = mkSimpleProgramAsm name $
+                    ret $ binOp Add256
+                        (assembly [Push $ midenWordToFelts mword1, Padw])
+                        (assembly [Push $ midenWordToFelts mword2, Padw])
+            errOrRes <- liftIO $ evalZKProgram (Just 8) prog
+            case errOrRes of
+                Left err      -> fail err
+                Right outputs -> do
+                    let expected = midenWordsToNatural [mword1] + midenWordsToNatural [mword2]
+                    pure $ expected === feltsToNatural (reverse outputs)
+
 test_evaluation :: TestTree
 test_evaluation =
     testGroup "Evaluation"
@@ -183,4 +210,5 @@ test_evaluation =
         , test_wordIsLitteEndianInMemory
         , test_naturalToMidenWords
         , test_setNatural
+        , test_addLimbs
         ]

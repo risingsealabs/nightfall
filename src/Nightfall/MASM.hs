@@ -152,6 +152,8 @@ ppInstr IXor64 = "exec.u64::checked_xor"
 ppInstr IRotl64 = "exec.u64::unchecked_rotl"
 ppInstr IRotr64 = "exec.u64::unchecked_rotr"
 
+ppInstr IAdd256 = "exec.u256::add_unsafe"
+
 ppInstr Assert = "assert"
 ppInstr AssertZ = "assertz"
 

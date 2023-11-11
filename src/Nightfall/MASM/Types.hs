@@ -139,6 +139,7 @@ data Instruction
   | IGte64
   | IRotl64
   | IRotr64
+  | IAdd256
   | Assert
   | AssertZ
   | Comment Text

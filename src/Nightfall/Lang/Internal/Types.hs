@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveTraversable #-}
+
 module Nightfall.Lang.Internal.Types
     ( module Nightfall.Lang.Internal.Types
     , Felt
@@ -63,6 +65,7 @@ data BinOp =
     | Div     -- ^ @a / b@ (integer division)
     | IDiv32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
     | IMax32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
+    | Add256
     | AddNat
 
     -- Boolean operations
@@ -145,8 +148,10 @@ isArrayOfFelt VarArrayOfFelt{} = True
 isArrayOfFelt _                = False
 
 -- | What Miden considers to be a Word.
-data MidenWord = MidenWord Felt Felt Felt Felt
-    deriving (Eq, Ord, Show)
+data MidenWordOf a = MidenWord a a a a
+    deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+type MidenWord = MidenWordOf Felt
 
 _midenWord0 :: MidenWord -> Felt
 _midenWord0 (MidenWord x0 _ _ _) = x0
@@ -206,14 +211,17 @@ naturalToMidenWords = map limb128toMidenWord . toLeLimbsOf (2 ^: 128) where
     limb128toMidenWord =
         unsafeFeltsToMidenWord . postpadTo 4 0 . map fromIntegral . toLeLimbsOf (2 ^: 32)
 
+feltsToNatural :: [Felt] -> Natural
+feltsToNatural = sum . zipWith mul (iterate (* 2 ^: 32) 1) where
+    mul :: Integer -> Felt -> Natural
+    mul x y = fromInteger $ x * unFelt y
+
 -- >>> import Nightfall.Prelude
 -- >>> let n = 5 + 2^:64 * 7 + 2^:256 * 2^:32 * 3
 -- >>> n == midenWordsToNatural (naturalToMidenWords n)
 -- True
 midenWordsToNatural :: [MidenWord] -> Natural
-midenWordsToNatural = sum . zipWith mul (iterate (* 2 ^: 32) 1) . concatMap midenWordToFelts where
-    mul :: Integer -> Felt -> Natural
-    mul x y = fromInteger $ x * unFelt y
+midenWordsToNatural = feltsToNatural . concatMap midenWordToFelts
 
 {- Note [The encoding of keys in advice_map]
 Encoding of keys in an @advice_map@ happens at
