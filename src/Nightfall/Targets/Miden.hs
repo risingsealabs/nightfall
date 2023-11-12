@@ -334,9 +334,7 @@ deref ptr = decorate [] ptr [MemLoad Nothing]
 derefw :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm MidenWord
 derefw ptr = decorate [Padw] ptr [MemLoadw Nothing]
 
-data Word256
-
-deref256 :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm Word256
+deref256 :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm word256
 deref256 ptr = decorate [] (derefw ptr) [Padw]
 
 onStack :: Expr (State Context [Instruction]) a
@@ -375,7 +373,10 @@ transpileBinOp NFTypes.AddNat = transpile $ do
         simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get ySize)) $
            ret $ binOp Add256 (deref256 $ Syntax.get yPtr + Syntax.get i) onStack
         Syntax.set i $ Syntax.get i + 1
-    -- TODO: use @eqw@ to drop the last word if it's zero?
+    ret . assembly $ pure [Drop, Drop, Drop]
+    ifElse onStack
+        (ret . assembly $ pure [Push [1, 0, 0, 0]])
+        (Syntax.set i $ Syntax.get i - 1)
     let dynPtr = Syntax.Binding Syntax.Felt dynPtrName
     elPtr <- Syntax.declare "elPtr" $ Syntax.get dynPtr + Syntax.get i
     Syntax.set dynPtr $ Syntax.get elPtr + 1
@@ -387,14 +388,6 @@ transpileBinOp NFTypes.AddNat = transpile $ do
     ret $ Syntax.get elPtr
     ret . assembly $ pure [MemStore Nothing]
     ret $ Syntax.get elPtr
-    -- ret $ assembly loadNat
-    -- -- ret . assembly $ pure [MemLoad . Just . unsafeToMemoryIndex $ unFelt dynamicMemoryHead]
-    -- ret . assembly $ pure [MemLoadw . Just . unsafeToMemoryIndex $ unFelt dynamicMemoryHead + 4]
-
--- 3 words: [24, 31, 1]
--- i = 3
--- dynPtr -> 10000
--- dynPtr' -> 10004
 
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
 transpileBinOp Lower          = pure [MASM.Lt]

@@ -209,13 +209,12 @@ test_addNats =
             let prog = mkSimpleProgramAsm name $ do
                     ret $ binOp AddNat (dyn nat1) (dyn nat2)
                     ret $ assembly loadNat
-                numLimbs = max (length $ naturalToMidenWords nat1) (length $ naturalToMidenWords nat2) + 1
-            errOrRes <- liftIO $ evalZKProgram (Just $ fromIntegral numLimbs * 4) prog
+                expected = nat1 + nat2
+                numLimbs = fromIntegral $ length (naturalToMidenWords expected) * 4
+            errOrRes <- liftIO $ evalZKProgram (Just numLimbs) prog
             case errOrRes of
                 Left err      -> error err
-                Right outputs -> do
-                    let expected = nat1 + nat2
-                    pure $ expected === feltsToNatural (reverse outputs)
+                Right outputs -> pure $ expected === feltsToNatural (reverse outputs)
 
 test_evaluation :: TestTree
 test_evaluation =
