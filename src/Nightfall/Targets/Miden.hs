@@ -340,12 +340,26 @@ deref256 ptr = decorate [] (derefw ptr) [Padw]
 onStack :: Expr (State Context [Instruction]) a
 onStack = assembly $ pure []
 
-loadNat :: State Context [Instruction]
-loadNat = transpile $ do
+loadNat :: Body (State Context [Instruction]) ()
+loadNat = do
     natPtr <- Syntax.declare "natPtr2" onStack
     repeatDynamic "counter3" (deref $ Syntax.get natPtr) $ do
         Syntax.set natPtr $ Syntax.get natPtr + 1
         ret . derefw $ Syntax.get natPtr
+
+storeNat :: asm ~ State Context [Instruction] => Expr asm Felt -> Body asm ()
+storeNat i = do
+    let dynPtr = Syntax.Binding Syntax.Felt dynPtrName
+    elPtr <- Syntax.declare "elPtr" $ Syntax.get dynPtr + i
+    Syntax.set dynPtr $ Syntax.get elPtr + 1
+    repeatDynamic "counter2" i $ do
+        ret $ Syntax.get elPtr
+        ret . assembly $ pure [MemStorew Nothing, Dropw]
+        Syntax.set elPtr $ Syntax.get elPtr - 1
+    ret i
+    ret $ Syntax.get elPtr
+    ret . assembly $ pure [MemStore Nothing]
+    ret $ Syntax.get elPtr
 
 -- | Transpile a binary operation.
 transpileBinOp :: BinOp -> State Context [Instruction]
@@ -377,17 +391,7 @@ transpileBinOp NFTypes.AddNat = transpile $ do
     ifElse onStack
         (ret . assembly $ pure [Push [1, 0, 0, 0]])
         (Syntax.set i $ Syntax.get i - 1)
-    let dynPtr = Syntax.Binding Syntax.Felt dynPtrName
-    elPtr <- Syntax.declare "elPtr" $ Syntax.get dynPtr + Syntax.get i
-    Syntax.set dynPtr $ Syntax.get elPtr + 1
-    repeatDynamic "counter2" (Syntax.get i) $ do
-        ret $ Syntax.get elPtr
-        ret . assembly $ pure [MemStorew Nothing, Dropw]
-        Syntax.set elPtr $ Syntax.get elPtr - 1
-    ret $ Syntax.get i
-    ret $ Syntax.get elPtr
-    ret . assembly $ pure [MemStore Nothing]
-    ret $ Syntax.get elPtr
+    storeNat $ Syntax.get i
 
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
 transpileBinOp Lower          = pure [MASM.Lt]

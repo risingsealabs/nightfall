@@ -208,10 +208,10 @@ test_addNats =
         monadicIO $ do
             let prog = mkSimpleProgramAsm name $ do
                     ret $ binOp AddNat (dyn nat1) (dyn nat2)
-                    ret $ assembly loadNat
+                    loadNat
                 expected = nat1 + nat2
-                numLimbs = fromIntegral $ length (naturalToMidenWords expected) * 4
-            errOrRes <- liftIO $ evalZKProgram (Just numLimbs) prog
+                numFelts = fromIntegral $ length (naturalToMidenWords expected) * 4
+            errOrRes <- liftIO $ evalZKProgram (Just numFelts) prog
             case errOrRes of
                 Left err      -> error err
                 Right outputs -> pure $ expected === feltsToNatural (reverse outputs)
