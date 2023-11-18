@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Nightfall.Lang.Types ( Felt
@@ -24,6 +25,7 @@ module Nightfall.Lang.Types ( Felt
                             , IsLiteral(..)
                             , lit
                             , assembly
+                            , unOp
                             , binOp
                             , add
                             , sub
@@ -155,8 +157,11 @@ mkZKProgram name body pubs secretFP = ZKProgram
 assembly :: asm -> Expr asm a
 assembly = Expr . Assembly
 
-binOp :: BinOp -> Expr asm a -> Expr asm b -> Expr asm c
-binOp op (Expr e1) (Expr e2) = Expr $ BinOp op e1 e2
+unOp :: forall asm a b. UnOp -> Expr asm a -> Expr asm b
+unOp = coerce (UnOp :: UnOp -> Expr_ asm -> Expr_ asm)
+
+binOp :: forall asm a b c. BinOp -> Expr asm a -> Expr asm b -> Expr asm c
+binOp = coerce (BinOp :: BinOp -> Expr_ asm -> Expr_ asm -> Expr_ asm)
 
 -- ** Arithmetic operations
 
@@ -164,39 +169,39 @@ add :: Expr asm Felt -> Expr asm Felt -> Expr asm Felt
 add = binOp Add
 
 sub :: Expr asm Felt -> Expr asm Felt -> Expr asm Felt
-sub (Expr e1) (Expr e2) = Expr $ BinOp Sub e1 e2
+sub = binOp Sub
 
 mul :: Expr asm Felt -> Expr asm Felt -> Expr asm Felt
-mul (Expr e1) (Expr e2) = Expr $ BinOp Mul e1 e2
+mul = binOp Mul
 
 div' :: Expr asm Felt -> Expr asm Felt -> Expr asm Felt
-div' (Expr e1) (Expr e2) = Expr $ BinOp Div e1 e2
+div' = binOp Div
 
 idiv32 :: Expr asm Word32 -> Expr asm Word32 -> Expr asm Word32
-idiv32 (Expr e1) (Expr e2) = Expr $ BinOp IDiv32 e1 e2
+idiv32 = binOp IDiv32
 
 -- ** Boolean operations
 
 eq :: Expr asm Felt -> Expr asm Felt -> Expr asm Bool
-eq (Expr e1) (Expr e2) = Expr $ BinOp Equal e1 e2
+eq = binOp Equal
 
 not' :: Expr asm Bool -> Expr asm Bool
-not' (Expr e) = Expr $ UnOp Not e
+not' = unOp Not
 
 lt :: Expr asm Felt -> Expr asm Felt -> Expr asm Bool
-lt (Expr e1) (Expr e2) = Expr $ BinOp Lower e1 e2
+lt = binOp Lower
 
 lte :: Expr asm Felt -> Expr asm Felt -> Expr asm Bool
-lte (Expr e1) (Expr e2) = Expr $ BinOp LowerEq e1 e2
+lte = binOp LowerEq
 
 gt :: Expr asm Felt -> Expr asm Felt -> Expr asm Bool
-gt (Expr e1) (Expr e2) = Expr $ BinOp Greater e1 e2
+gt = binOp Greater
 
 gte :: Expr asm Felt -> Expr asm Felt -> Expr asm Bool
-gte (Expr e1) (Expr e2) = Expr $ BinOp GreaterEq e1 e2
+gte = binOp GreaterEq
 
 isOdd :: Expr asm Felt -> Expr asm Bool
-isOdd (Expr e) = Expr $ UnOp IsOdd e
+isOdd = unOp IsOdd
 
 getAt :: VarName -> Expr asm Felt -> Expr asm Felt
 getAt var (Expr i) = Expr $ GetAt var i
