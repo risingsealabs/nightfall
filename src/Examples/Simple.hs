@@ -186,7 +186,7 @@ simpleInitArray = mkSimpleProgram "simple initArray" $ do
 simpleNat :: ZKProgram
 simpleNat = mkSimpleProgram "simple nat" $ do
     initArray "fakeArr" []
-    _ <- declareOf Nat "n" . dyn $ 5 + 2^:64 * 7 + 2^:128 * 3
+    _ <- declareOf Nat "n" . lit $ 5 + 2^:64 * 7 + 2^:128 * 3
     comment "n[0] + n[1] = 5 + 3 = 8"
     let getLimbAt i = getAt "fakeArr" (lit $ dynamicMemoryHead + i + 1)
     ret $ getLimbAt 0 + getLimbAt 1

@@ -166,7 +166,7 @@ test_setNatural =
             let nats = map unHugeNatural hugeNats
                 prog = mkSimpleProgram name $
                     for_ (zip [0 :: Int ..] nats) $ \(i, n) ->
-                        statement . DeclVariable VarNat ("n" ++ show i) . unExpr $ dyn n
+                        statement . DeclVariable VarNat ("n" ++ show i) . unExpr $ lit n
                 (masm, _) = runState (transpileZKProgram prog) defaultContext
                 offset = dynamicMemoryHead +
                     sum (map (succ . genericLength . naturalToMidenWords) $ take target nats)
@@ -207,7 +207,7 @@ test_addNats =
     in testProperty name . withMaxSuccess 70 $ \(HugeNatural nat1) (HugeNatural nat2) ->
         monadicIO $ do
             let prog = mkSimpleProgramAsm name $ do
-                    ret $ binOp AddNat (dyn nat1) (dyn nat2)
+                    ret $ binOp AddNat (lit nat1) (lit nat2)
                     loadNat
                 expected = nat1 + nat2
                 numFelts = fromIntegral $ length (naturalToMidenWords expected) * 4

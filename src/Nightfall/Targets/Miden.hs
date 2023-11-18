@@ -17,6 +17,7 @@ module Nightfall.Targets.Miden ( dynamicMemoryHead
                                , decorateM
                                , decorate
                                , onStack
+                               , storeNat
                                , loadNat
                                , toHashModule
                                , transpileZKProgram
@@ -340,13 +341,6 @@ deref256 ptr = decorate [] (derefw ptr) [Padw]
 onStack :: Expr (State Context [Instruction]) a
 onStack = assembly $ pure []
 
-loadNat :: Body (State Context [Instruction]) ()
-loadNat = do
-    natPtr <- Syntax.declare "natPtr2" onStack
-    repeatDynamic "counter3" (deref $ Syntax.get natPtr) $ do
-        Syntax.set natPtr $ Syntax.get natPtr + 1
-        ret . derefw $ Syntax.get natPtr
-
 storeNat :: asm ~ State Context [Instruction] => Expr asm Felt -> Body asm ()
 storeNat i = do
     let dynPtr = Syntax.Binding Syntax.Felt dynPtrName
@@ -360,6 +354,13 @@ storeNat i = do
     ret $ Syntax.get elPtr
     ret . assembly $ pure [MemStore Nothing]
     ret $ Syntax.get elPtr
+
+loadNat :: Body (State Context [Instruction]) ()
+loadNat = do
+    natPtr <- Syntax.declare "natPtr2" onStack
+    repeatDynamic "counter3" (deref $ Syntax.get natPtr) $ do
+        Syntax.set natPtr $ Syntax.get natPtr + 1
+        ret . derefw $ Syntax.get natPtr
 
 -- | Transpile a binary operation.
 transpileBinOp :: BinOp -> State Context [Instruction]
@@ -399,13 +400,10 @@ transpileBinOp LowerEq        = pure [MASM.Lte]
 transpileBinOp Greater        = pure [MASM.Gt]
 transpileBinOp GreaterEq      = pure [MASM.Gte]
 
-transpileLiteral :: Literal -> Felt
-transpileLiteral (LiteralFelt x)        = x
-transpileLiteral (LiteralBool b)        = if b then 1 else 0
-transpileLiteral (LiteralNatPtr natPtr) = natPtr
-
-transpileDynamic :: Dynamic -> State Context [Instruction]
-transpileDynamic (DynamicNat nat) = do
+transpileLiteral :: Literal -> State Context [Instruction]
+transpileLiteral (LiteralFelt x) = return . singleton $ Push [x]
+transpileLiteral (LiteralBool b) = return . singleton $ Push [if b then 1 else 0]
+transpileLiteral (LiteralNat nat) = do
     instrsInitDynPtr <- use mayDynMemPtr >>= \case
         Just _  -> pure []
         Nothing -> do
@@ -434,6 +432,7 @@ transpileDynamic (DynamicNat nat) = do
                 , instrsIncDynPtr
                 ]
     pure $ instrsInitDynPtr ++ instrsGetDynPtr ++ instrsSize ++ instrsLimbs
+transpileLiteral (LiteralNatPtr natPtr) = return . singleton $ Push [natPtr]
 
 class Transpile a where
     transpile :: a -> State Context [Instruction]
@@ -467,8 +466,7 @@ transpileExpr :: Transpile asm => Expr_ asm -> State Context [Instruction]
 transpileExpr (Assembly asm) = transpile asm
 
 -- Literals are simply pushed onto the stack
-transpileExpr (Literal l) = return . singleton $ Push [transpileLiteral l]
-transpileExpr (Dynamic d) = transpileDynamic d
+transpileExpr (Literal l) = transpileLiteral l
 
 transpileExpr (Var varname) = do
     -- Fetch the memory location of that variable in memory, and push it to the stack

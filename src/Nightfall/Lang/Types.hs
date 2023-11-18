@@ -23,8 +23,6 @@ module Nightfall.Lang.Types ( Felt
                             , mkZKProgram
                             , IsLiteral(..)
                             , lit
-                            , IsDynamic(..)
-                            , dyn
                             , assembly
                             , binOp
                             , add
@@ -78,17 +76,11 @@ instance IsLiteral Felt where
 instance IsLiteral Bool where
     literal = LiteralBool
 
+instance IsLiteral Natural where
+    literal = LiteralNat
+
 lit :: IsLiteral a => a -> Expr asm a
 lit = Expr . Literal . literal
-
-class IsDynamic a where
-    dynamic :: a -> Dynamic
-
-instance IsDynamic Natural where
-    dynamic = DynamicNat
-
-dyn :: IsDynamic a => a -> Expr asm a
-dyn = Expr . Dynamic . dynamic
 
 -- | Num instance to make writings easier, to allow wriring expressions with "+", "-", etc.
 instance a ~ Felt => Num (Expr asm a) where

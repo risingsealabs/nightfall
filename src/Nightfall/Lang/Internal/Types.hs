@@ -79,19 +79,15 @@ data BinOp =
 data Literal =
       LiteralFelt Felt
     | LiteralBool Bool
+    | LiteralNat Natural
     | LiteralNatPtr Felt
     -- TODO: 'LiteralNat'?
-    deriving (Eq, Show)
-
-data Dynamic =
-      DynamicNat Natural
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
 data Expr_ asm =
       Assembly asm
     | Literal Literal
-    | Dynamic Dynamic
 
     | UnOp UnOp (Expr_ asm)
     | BinOp BinOp (Expr_ asm) (Expr_ asm)
