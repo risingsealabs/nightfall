@@ -145,7 +145,13 @@ instance Arbitrary HugeNatural where
             pure $ 2 ^ powerOf2 * coeff
         pure . HugeNatural . fromIntegral $ sum addendums
 
-    -- shrink = map (HugeNatural . fromInteger) . shrink . toInteger . unHugeNatural
+    -- By default at each shrink QuickCheck at most divides the number by two, which makes the
+    -- number smaller way too slow. We add square root to speed up the process.
+    shrink (HugeNatural nat) = coerce $ concat
+        [ [0 | nat /= 0]
+        , [floor . sqrt @Double $ fromIntegral nat | nat > 4]
+        , drop 1 . map (nat -) . takeWhile (/= 0) $ iterate (`quot` 2) nat
+        ]
 
 test_naturalToMidenWords :: TestTree
 test_naturalToMidenWords =

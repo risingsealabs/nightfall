@@ -194,6 +194,8 @@ alloc var varType = do
             variables .= Map.insert var (VarInfo varType varPos) vars
             pure varPos
 
+-- | Compile
+--
 -- > repeat.count
 -- >   body
 --
