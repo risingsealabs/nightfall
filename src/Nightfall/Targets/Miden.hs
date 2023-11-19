@@ -37,17 +37,15 @@ module Nightfall.Targets.Miden ( dynamicMemoryHead
                                , config
                                ) where
 
+import Nightfall.Alphabet
 import Nightfall.Lang.Internal.Types as NFTypes
 import qualified Nightfall.Lang.Syntax.Default as Syntax
 import Nightfall.Lang.Types
 import Nightfall.MASM.Miden
 import Nightfall.MASM.Types as MASM
-import Nightfall.Prelude
 
 import Control.Lens ((.=), (%=), (?=), use)
 import Control.Monad.State
-import Data.Kind
-import Data.Word
 import System.IO.Unsafe
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -378,7 +376,7 @@ deref ptr = decorate [] ptr [MemLoad Nothing]
 derefw :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm MidenWord
 derefw ptr = decorate [Padw] ptr [MemLoadw Nothing]
 
-deref256 :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm word256
+deref256 :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm Word256
 deref256 ptr = decorate [] (derefw ptr) [Padw]
 
 onStack :: Expr (State Context [Instruction]) a
@@ -426,15 +424,16 @@ transpileBinOp NFTypes.AddNat = transpile $ do
     ret . assembly $ pure [Padw]  -- @carry@
     repeatDynamic "counter1" (binOp IMax32 (Syntax.get xSize) (Syntax.get ySize)) $ do
         ret . assembly $ pure [Padw]
-        simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get xSize)) $
-           ret $ binOp Add256 (deref256 $ Syntax.get xPtr + Syntax.get i) onStack
-        simpleIf (binOp LowerEq (Syntax.get i) (Syntax.get ySize)) $
-           ret $ binOp Add256 (deref256 $ Syntax.get yPtr + Syntax.get i) onStack
+        simpleIf (Syntax.get i `lte` Syntax.get xSize) $
+           ret $ add256 (deref256 $ Syntax.get xPtr + Syntax.get i) onStack
+        simpleIf (Syntax.get i `lte` Syntax.get ySize) $
+           ret $ add256 (deref256 $ Syntax.get yPtr + Syntax.get i) onStack
         Syntax.set i $ Syntax.get i + 1
     ret . assembly $ pure [Drop, Drop, Drop]
     ifElse onStack
         (ret . assembly $ pure [Push [1, 0, 0, 0]])
         (Syntax.set i $ Syntax.get i - 1)
+    -- TODO: forgot length?
     storeNat $ Syntax.get i
 
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
@@ -474,7 +473,6 @@ transpileLiteral (LiteralNat nat) = do
                 , instrsIncDynPtr
                 ]
     pure $ instrsInitDynPtr ++ instrsGetDynPtr ++ instrsSize ++ instrsLimbs
-transpileLiteral (LiteralNatPtr natPtr) = return . singleton $ Push [natPtr]
 
 -- TODO: range check, etc.
 transpileExpr :: Transpile asm => Expr_ asm -> State Context [Instruction]

@@ -5,15 +5,14 @@
 {-# LANGUAGE OverloadedLists #-}
 module Nightfall.MASM where
 
-import Control.Monad
+import Nightfall.Alphabet
+import Nightfall.MASM.Callgraph
+import Nightfall.MASM.Types
+
 import Control.Monad.Writer.Strict
 
 import qualified Data.DList as DList
-import Data.Foldable
-import Data.Text (Text, pack, unpack)
-
-import Nightfall.MASM.Callgraph
-import Nightfall.MASM.Types
+import Data.Text (pack, unpack)
 
 comment :: Show a => a -> Instruction
 comment = Comment . pack . show

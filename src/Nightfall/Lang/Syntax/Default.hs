@@ -2,10 +2,9 @@
 
 module Nightfall.Lang.Syntax.Default where
 
+import Nightfall.Alphabet
 import Nightfall.Lang.Types
 import Nightfall.Lang.Internal.Types
-
-import GHC.Natural
 
 data DeclType a where
     Felt :: DeclType Felt

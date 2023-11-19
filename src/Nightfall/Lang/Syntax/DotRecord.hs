@@ -23,14 +23,12 @@
 
 module Nightfall.Lang.Syntax.DotRecord where
 
+import Nightfall.Alphabet
 import Nightfall.Lang.Types
 import Nightfall.Lang.Internal.Types
 
 import Data.Kind
-import Data.Proxy
-import GHC.Exts
 import GHC.Records
-import GHC.TypeLits
 import Unsafe.Coerce (UnsafeEquality (..), unsafeEqualityProof)
 
 {- Note [Surface syntax through OverloadedRecordDot]

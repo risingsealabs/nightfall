@@ -1,16 +1,18 @@
 module Main where
 
-import Nightfall.MASM
-import Control.Monad.State
-import Nightfall.Targets.Miden
 import Examples.Simple
 import Examples.Cond
 import Examples.Loops
 import Examples.Fun
 import Examples.Inputs
+
+import Nightfall.Alphabet
+import Nightfall.MASM
+import Nightfall.Targets.Miden
+
+import Control.Monad.State
 import Data.Map as Map
 import System.Environment (getArgs, getProgName)
-import Control.Monad ( when )
 
 main :: IO ()
 main = do

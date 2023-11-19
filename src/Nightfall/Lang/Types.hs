@@ -32,7 +32,8 @@ module Nightfall.Lang.Types ( Felt
                             , mul
                             , div'
                             , idiv32
-                            , BinOp (AddNat)
+                            , add256
+                            , addNat
                             , eq
                             , not'
                             , lt
@@ -56,12 +57,10 @@ module Nightfall.Lang.Types ( Felt
                             , emptyLine
                             ) where
 
+import Nightfall.Alphabet
 import Nightfall.Lang.Internal.Types
-import Nightfall.Prelude
 
 import Control.Monad.Free.Church
-import Data.Word (Word32)
-import GHC.Natural
 import qualified Data.Map.Strict as Map
 
 -- | Expression wrapper type, typed for safety, exposed to use
@@ -179,6 +178,12 @@ div' = binOp Div
 
 idiv32 :: Expr asm Word32 -> Expr asm Word32 -> Expr asm Word32
 idiv32 = binOp IDiv32
+
+add256 :: Expr asm Word256 -> Expr asm Word256 -> Expr asm Word256
+add256 = binOp Add256
+
+addNat :: Expr asm Natural -> Expr asm Natural -> Expr asm Natural
+addNat = binOp AddNat
 
 -- ** Boolean operations
 

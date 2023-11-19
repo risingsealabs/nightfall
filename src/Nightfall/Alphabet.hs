@@ -1,13 +1,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Nightfall.Prelude
+module Nightfall.Alphabet
      ( module Export
-     , module Nightfall.Prelude
+     , module Nightfall.Alphabet
      ) where
 
 -- base
 import Control.Applicative as Export
-import Control.Exception as Export
+import Control.Exception as Export hiding (TypeError)
 import Control.Monad as Export
 import Control.Monad.IO.Class as Export
 import Data.Bifunctor as Export
@@ -31,10 +31,14 @@ import Data.Semigroup as Export
 import Data.String as Export
 import Data.Traversable as Export
 import Data.Tuple as Export
+import Data.Typeable as Export
 import Data.Void as Export
-import Debug.Trace as Export
-import GHC.Exts as Export (groupWith, sortWith)
+import Data.Word as Export
+import GHC.TypeLits as Export hiding (Mod)
+import GHC.Bits as Export (toIntegralSized)
+import GHC.Exts as Export hiding (Any, toList)
 import GHC.Generics as Export (Generic, Generic1)
+import GHC.Natural as Export
 import GHC.Stack as Export
 import Numeric as Export
 import System.IO as Export
@@ -51,6 +55,9 @@ import Data.Text as Export (Text)
 
 -- lens
 import Control.Lens as Export (makeLenses)
+
+-- wide-word
+import Data.WideWord.Word256 as Export
 
 infixr 8 ^:
 (^:) :: Integral a => a -> Int -> a

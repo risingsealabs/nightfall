@@ -7,11 +7,8 @@
 
 module Nightfall.Lang.Internal.Felt where
 
-import Data.Bifunctor
-import Data.Coerce
-import GHC.Generics
-import Data.Typeable
-import GHC.TypeNats hiding (Mod)
+import Nightfall.Alphabet
+
 import Data.Mod
 
 {- Note [Handling of integral types]

@@ -7,13 +7,7 @@
 
 module Nightfall.MASM.Integral where
 
-import Control.Monad
-import Data.Coerce
-import Data.Typeable
-import Data.Word (Word8, Word32)
-import GHC.Bits (toIntegralSized)
-import GHC.Generics
-import GHC.TypeNats
+import Nightfall.Alphabet
 
 -- | The type of indices into Miden's stack, each element is greater than or equal to @lower@ and
 -- less than or equal to @upper@.

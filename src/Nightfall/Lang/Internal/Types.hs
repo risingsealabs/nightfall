@@ -8,10 +8,8 @@ module Nightfall.Lang.Internal.Types
     , feltOrderInteger
     ) where
 
-import Nightfall.Prelude
+import Nightfall.Alphabet
 
-import Data.Word
-import GHC.Natural
 import Nightfall.Lang.Internal.Felt
 import Text.Printf (printf)
 
@@ -80,8 +78,6 @@ data Literal =
       LiteralFelt Felt
     | LiteralBool Bool
     | LiteralNat Natural
-    | LiteralNatPtr Felt
-    -- TODO: 'LiteralNat'?
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
@@ -212,7 +208,7 @@ feltsToNatural = sum . zipWith mul (iterate (* 2 ^: 32) 1) where
     mul :: Integer -> Felt -> Natural
     mul x y = fromInteger $ x * unFelt y
 
--- >>> import Nightfall.Prelude
+-- >>> import Nightfall.Alphabet
 -- >>> let n = 5 + 2^:64 * 7 + 2^:256 * 2^:32 * 3
 -- >>> n == midenWordsToNatural (naturalToMidenWords n)
 -- True

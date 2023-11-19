@@ -1,22 +1,17 @@
 module Nightfall.MASM.Miden where
 
+import Nightfall.Alphabet
+import Nightfall.Lang.Internal.Types
 import Nightfall.Lang.Types
 import Nightfall.MASM
 import Nightfall.MASM.Types
-import Nightfall.Lang.Internal.Types
 
-import Control.Monad
-import Data.List
 import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Word
 import System.Directory
 import System.Exit
 import System.FilePath
-import System.IO
 import System.IO.Temp
 import System.Process
-import Text.Read
 
 data KeepFile = Keep FilePath | DontKeep
   deriving Show

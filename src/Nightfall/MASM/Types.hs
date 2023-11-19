@@ -21,14 +21,11 @@ module Nightfall.MASM.Types
     , unsafeToMemoryIndex
     ) where
 
-import Nightfall.MASM.Integral
+import Nightfall.Alphabet
 import Nightfall.Lang.Types
-import Nightfall.Prelude
+import Nightfall.MASM.Integral
 
 import Control.Monad.Writer.Strict
-import Data.Typeable
-import Data.Word (Word32)
-import GHC.Natural
 import qualified Data.DList as DList
 import qualified GHC.Exts
 

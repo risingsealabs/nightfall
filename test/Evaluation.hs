@@ -6,17 +6,15 @@ module Evaluation
     ( test_evaluation
     ) where
 
+import Nightfall.Alphabet
 import Nightfall.Lang.Internal.Types
 import Nightfall.Lang.Types
 import Nightfall.MASM.Miden
 import Nightfall.MASM.Types
-import Nightfall.Prelude
 import Nightfall.Targets.Miden
 
 import Control.Lens
 import Control.Monad.State
-import Data.Word
-import GHC.Natural
 import Test.QuickCheck.Monadic
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -213,7 +211,7 @@ test_addNats =
     in testProperty name . withMaxSuccess 70 $ \(HugeNatural nat1) (HugeNatural nat2) ->
         monadicIO $ do
             let prog = mkSimpleProgramAsm name $ do
-                    ret $ binOp AddNat (lit nat1) (lit nat2)
+                    ret $ addNat (lit nat1) (lit nat2)
                     loadNat
                 expected = nat1 + nat2
                 numFelts = fromIntegral $ length (naturalToMidenWords expected) * 4
