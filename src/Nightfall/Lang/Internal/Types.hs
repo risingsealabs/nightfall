@@ -82,7 +82,7 @@ data Literal =
 
 -- | Expression, internal type, not exposed
 data Expr_ asm =
-      Assembly asm
+      Assembly asm  -- ^ Assembly code. Not useful for users, but useful for compiler developers.
     | Literal Literal
 
     | UnOp UnOp (Expr_ asm)
@@ -157,11 +157,12 @@ _midenWord2 (MidenWord _ _ x2 _) = x2
 _midenWord3 :: MidenWord -> Felt
 _midenWord3 (MidenWord _ _ _ x3) = x3
 
+-- | Convert a 'MidenWord' to a list of 'Felt's.
+-- The opposite of 'unsafeFeltsToMidenWord'.
 midenWordToFelts :: MidenWord -> [Felt]
 midenWordToFelts (MidenWord x0 x1 x2 x3) = [x0, x1, x2, x3]
 
--- | Convert a list of 'Felt's into a list of 'MidenWord's by padding each of the 'Felt's with
--- zeros.
+-- | Convert a list of 'Felt's to a list of 'MidenWord's by padding each of the 'Felt's with zeroes.
 padFeltsAsMidenWords :: [Felt] -> [MidenWord]
 padFeltsAsMidenWords = map $ \x0 -> MidenWord x0 0 0 0
 
@@ -170,9 +171,13 @@ feltsToMidenWord :: [Felt] -> Maybe MidenWord
 feltsToMidenWord [x0, x1, x2, x3] = Just $ MidenWord x0 x1 x2 x3
 feltsToMidenWord _                = Nothing
 
+-- | Convert a list of 'Felt's to a 'MidenWord' or fail if the number of elements is not equal to 4.
+-- The opposite of 'midenWordToFelts'.
 unsafeFeltsToMidenWord :: [Felt] -> MidenWord
 unsafeFeltsToMidenWord = fromMaybe (error "Bad 'MidenWord'") . feltsToMidenWord
 
+-- | Append a value to a list as many times as necessary to create a list of the given length.
+--
 -- >>> map (\i -> (i, postpadTo i 'a' "bc")) [0..5]
 -- [(0,"bc"),(1,"bc"),(2,"bc"),(3,"bca"),(4,"bcaa"),(5,"bcaaa")]
 postpadTo :: Int -> a -> [a] -> [a]
@@ -181,6 +186,8 @@ postpadTo n0 xp = go n0 where
     go n []       = replicate n xp
     go n (x : xs) = x : go (n - 1) xs
 
+-- | Convert a number to a list of limbs in the given base, in little-endian.
+--
 -- >>> toLeLimbsOf 10 (1 :: Int)
 -- [1]
 -- >>> toLeLimbsOf 10 (23 :: Int)
@@ -194,22 +201,30 @@ toLeLimbsOf limbSize = go where
         | otherwise    = limb : go x'
         where (x', limb) = x `quotRem` limbSize
 
--- >>> naturalToMidenWords (5 + 2^:64 * 7 + 2^:128 * 2^:32 * 3)
+-- | Convert a 'Natural' to a list of 'MidenWord's. Each 'Felt' in the resulting 'MidenWord's
+-- represents a 'Word32' number.
+-- The opposite of 'midensWordToNatural'.
+--
+-- >>> naturalToMidenWords (5 + 2^!64 * 7 + 2^!128 * 2^!32 * 3)
 -- [MidenWord 5 0 7 0,MidenWord 0 3 0 0]
--- >>> naturalToMidenWords (5 + 2^:64 * 7 + 2^:256 * 2^:32 * 3)
+-- >>> naturalToMidenWords (5 + 2^!64 * 7 + 2^!256 * 2^!32 * 3)
 -- [MidenWord 5 0 7 0,MidenWord 0 0 0 0,MidenWord 0 3 0 0]
 naturalToMidenWords :: Natural -> [MidenWord]
-naturalToMidenWords = map limb128toMidenWord . toLeLimbsOf (2 ^: 128) where
+naturalToMidenWords = map limb128toMidenWord . toLeLimbsOf (2 ^! 128) where
     limb128toMidenWord =
-        unsafeFeltsToMidenWord . postpadTo 4 0 . map fromIntegral . toLeLimbsOf (2 ^: 32)
+        unsafeFeltsToMidenWord . postpadTo 4 0 . map fromIntegral . toLeLimbsOf (2 ^! 32)
 
+-- | Convert a list of 'Felt's to a 'Natural'.
 feltsToNatural :: [Felt] -> Natural
-feltsToNatural = sum . zipWith mul (iterate (* 2 ^: 32) 1) where
+feltsToNatural = sum . zipWith mul (iterate (* 2 ^! 32) 1) where
     mul :: Integer -> Felt -> Natural
     mul x y = fromInteger $ x * unFelt y
 
+-- | Convert a list of 'MidenWord's to a 'Natural'.
+-- The opposite of 'midensWordToNatural'.
+--
 -- >>> import Nightfall.Alphabet
--- >>> let n = 5 + 2^:64 * 7 + 2^:256 * 2^:32 * 3
+-- >>> let n = 5 + 2^!64 * 7 + 2^!256 * 2^!32 * 3
 -- >>> n == midenWordsToNatural (naturalToMidenWords n)
 -- True
 midenWordsToNatural :: [MidenWord] -> Natural

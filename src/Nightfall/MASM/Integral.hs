@@ -62,6 +62,7 @@ unsafeUnMemoryIndex = coerce
 
 -- | Convert an 'Integer' to the corresponding 'MemoryIndex'. Returns 'Nothing' if the integer
 -- doesn't fit into 'MemoryIndex'.
+--
 -- >>> import Data.Word
 -- >>> let m = toInteger (maxBound :: Word32)
 -- >>> map toMemoryIndex [-42, 0, 42, m, m + 1]
@@ -69,6 +70,8 @@ unsafeUnMemoryIndex = coerce
 toMemoryIndex :: Integer -> Maybe MemoryIndex
 toMemoryIndex = coerce (toIntegralSized :: Integer -> Maybe Word32)
 
+-- | Convert an 'Integer' to the corresponding 'MemoryIndex'. Returns 'Nothing' if the integer
+-- doesn't fit into 'MemoryIndex' or is strictly less than the given threshold.
 toMemoryIndexBelow :: Integer -> Integer -> Maybe MemoryIndex
 toMemoryIndexBelow maxExcl n = do
     guard $ n < maxExcl

@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | A custom prelude. The name starts with an 'A', so that this module appears first in most cases
+-- when module imports are sorted lexicographically.
 module Nightfall.Alphabet
      ( module Export
      , module Nightfall.Alphabet
@@ -59,21 +61,24 @@ import Control.Lens as Export (makeLenses)
 -- wide-word
 import Data.WideWord.Word256 as Export
 
-infixr 8 ^:
-(^:) :: Integral a => a -> Int -> a
-(^:) = (^)
+infixr 8 ^!
+-- | Power with fixed exponent type. This eliminates warnings about using default types.
+(^!) :: Integral a => a -> Int -> a
+(^!) = (^)
 
--- | Applicatively fold a 'Foldable'.
+-- | Applicatively fold a 'Foldable' with a function.
 foldMapA
     :: forall b m f a. (Monoid b, Applicative m, Foldable f)
     => (a -> m b) -> f a -> m b
 foldMapA = coerce (foldMap :: (a -> Ap m b) -> f a -> Ap m b)
 
+-- | Applicatively fold a 'Foldable'.
 foldA
     :: forall a m f. (Monoid a, Applicative m, Foldable f)
     => f (m a) -> m a
 foldA = foldMapA id
 
+-- | Applicatively fold a 'Foldable' with a function.
 foldFor
     :: forall b m f a. (Monoid b, Applicative m, Foldable f)
     => f a -> (a -> m b) -> m b

@@ -4,6 +4,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Evaluation
     ( test_evaluation
+    , HugeNatural
+    , unHugeNatural
     ) where
 
 import Nightfall.Alphabet
@@ -20,9 +22,44 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import qualified Data.Map as Map
 
+-- | A list of ranges: @[(0, 10), (11, 100), (101, 1000), ... (10^n + 1, highest)]@ for @base = 10@.
+magnitudesPositive :: (Num a, Integral a, Ord a) => a -> a -> [(a, a)]
+magnitudesPositive base highest =
+    zipWith (\low high -> (low + 1, high)) borders (tail borders)
+  where
+    preborders = tail . takeWhile (< highest `div` base) $ iterate (* base) 1
+    borders = -1 : preborders ++ [last preborders * base, highest]
+
+-- | Generate asymptotically greater numbers with exponentially lower chance.
+arbitraryPositive :: (Bounded a, Num a, Integral a, Ord a) => a -> a -> Gen a
+arbitraryPositive base highest =
+    frequency . zip freqs . reverse . map chooseBoundedIntegral $ magnitudesPositive base highest
+  where
+    freqs = map floor $ iterate (* 1.3) (2 :: Double)
+
+-- >>> shrinkIntegralFast (0 :: Integer)
+-- []
+-- >>> shrinkIntegralFast (1 :: Integer)
+-- [0]
+-- >>> shrinkIntegralFast (9 :: Integer)
+-- [0,3,5,7,8]
+-- >>> shrinkIntegralFast (-10000 :: Integer)
+-- [0,-100,-5000,-7500,-8750,-9375,-9688,-9844,-9922,-9961,-9981,-9991,-9996,-9998,-9999,10000]
+shrinkIntegralFast :: Integral a => a -> [a]
+shrinkIntegralFast x = concat
+    [ [0 | x /= 0]
+    , [signum x * floor (sqrt @Double $ fromIntegral xA) | let xA = abs x, xA > 4]
+    , drop 1 . map (x -) . takeWhile (/= 0) $ iterate (`quot` 2) x
+    , [-x | x < 0]
+    ]
+
+-- >>> import Nightfall.Lang.Internal.Types
+-- >>> import Test.Tasty.QuickCheck
+-- >>> sample' (arbitrary :: Gen Felt)
+-- [406240826,4,5943,214843025361102877,750349539,133,660708,99,4010657904678,154063,209048]
 instance Arbitrary Felt where
-    arbitrary = fromInteger <$> arbitrary
-    shrink = map fromInteger . shrink . unFelt
+    arbitrary = fromIntegral <$> arbitraryPositive 10 (maxBound @Word64)
+    shrink = map fromInteger . shrinkIntegralFast . unFelt
 
 instance Arbitrary a => Arbitrary (MidenWordOf a) where
     arbitrary = MidenWord <$> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
@@ -136,20 +173,14 @@ unHugeNatural = coerce
 instance Arbitrary HugeNatural where
     arbitrary = do
         addendums <- listOf $ do
-            -- TODO: magnitudes should be chosen uniformly, not actual integers, since the latter
-            -- means most are going to be greater than 128 and we want to test lesser ones too.
-            powerOf2 <- chooseInteger (0, 800)
-            coeff <- chooseInteger (0, 2 ^: 32 - 1)
+            powerOf2 <- toInteger <$> arbitraryPositive 4 (1000 :: Word32)
+            coeff <- toInteger <$> arbitraryPositive 10 (maxBound :: Word32)
             pure $ 2 ^ powerOf2 * coeff
         pure . HugeNatural . fromIntegral $ sum addendums
 
     -- By default at each shrink QuickCheck at most divides the number by two, which makes the
     -- number smaller way too slow. We add square root to speed up the process.
-    shrink (HugeNatural nat) = coerce $ concat
-        [ [0 | nat /= 0]
-        , [floor . sqrt @Double $ fromIntegral nat | nat > 4]
-        , drop 1 . map (nat -) . takeWhile (/= 0) $ iterate (`quot` 2) nat
-        ]
+    shrink = coerce . shrinkIntegralFast . unHugeNatural
 
 test_naturalToMidenWords :: TestTree
 test_naturalToMidenWords =
@@ -205,6 +236,7 @@ test_addLimbs =
                     let expected = midenWordsToNatural [mword1] + midenWordsToNatural [mword2]
                     pure $ expected === feltsToNatural (reverse outputs)
 
+-- TODO: test length too.
 test_addNats :: TestTree
 test_addNats =
     let name = "addNats"

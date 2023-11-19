@@ -433,7 +433,6 @@ transpileBinOp NFTypes.AddNat = transpile $ do
     ifElse onStack
         (ret . assembly $ pure [Push [1, 0, 0, 0]])
         (Syntax.set i $ Syntax.get i - 1)
-    -- TODO: forgot length?
     storeNat $ Syntax.get i
 
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
