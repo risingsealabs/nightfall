@@ -221,7 +221,8 @@ feltsToNatural = sum . zipWith mul (iterate (* 2 ^! 32) 1) where
     mul x y = fromInteger $ x * unFelt y
 
 -- | Convert a list of 'MidenWord's to a 'Natural'.
--- The opposite of 'midensWordToNatural'.
+-- The opposite of 'midensWordToNatural' modulo zero words at the end and words that have 'Felt's
+-- greater than or equal to @2^!32@ in them.
 --
 -- >>> import Nightfall.Alphabet
 -- >>> let n = 5 + 2^!64 * 7 + 2^!256 * 2^!32 * 3

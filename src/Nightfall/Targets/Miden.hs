@@ -15,9 +15,12 @@ module Nightfall.Targets.Miden ( dynamicMemoryHead
                                , Config(..)
                                , defaultConfig
                                , VarInfo(..)
+                               , onStack
                                , decorateM
                                , decorate
-                               , onStack
+                               , deref
+                               , derefw
+                               , deref256
                                , storeNat
                                , loadNat
                                , toHashModule
@@ -52,8 +55,21 @@ import qualified Data.Set as Set
 import qualified Data.Text as SText
 import qualified Data.Text as Strict (Text)
 
+-- | Determines where the dynamic part of memory starts. We need to separate memory into static and
+-- dynamic, because the former is more efficient but not always sufficient: it's best to allocate a
+-- 'Felt' variable statically and directly load it onto the stack when necessary, but it's only
+-- possible because we know how much space a 'Felt' value consumes in memory. A 'Natural' is
+-- different: we don't know statically how much space an arbitrary computed at runtime natural is
+-- going to consume, hence we statically allocate a pointer to a blob of dynamic memory and follow
+-- the pointer at runtime, which is an additional indirection, but a necessary one.
+--
+-- This is just a broke man runtime memory management system with no ability to release memory.
+-- Long-term, we should implement something proper.
 dynamicMemoryHead :: Felt
-dynamicMemoryHead = 1000000
+dynamicMemoryHead = fromInteger $ 10 ^! 8
+
+toStaticMemoryIndex :: Integer -> Maybe MemoryIndex
+toStaticMemoryIndex = toMemoryIndexBelow $ unFelt dynamicMemoryHead
 
 dynPtrName :: VarName
 dynPtrName = "__dynPtr"
@@ -103,7 +119,11 @@ defaultContext = Context
     , _config = defaultConfig
     }
 
+-- | A class for things that can be transpiled.
 class Transpile a where
+    -- Constraints required to transpile @a@ without any assembly in it. Just for convenience, so
+    -- that we don't need to instantiate @asm@ type variables with 'Void' manually at each call
+    -- site.
     type NoAsm a :: Constraint
     transpile :: a -> State Context [Instruction]
 
@@ -172,9 +192,6 @@ toNumWords VarBool              = 1
 toNumWords (VarArrayOfFelt len) = len
 toNumWords VarNat               = 1
 
-staticMaxMemoryIndex :: Integer -> Maybe MemoryIndex
-staticMaxMemoryIndex = toMemoryIndexBelow $ 10 ^ (7 :: Int)
-
 -- | Allocate memory for a variable.
 alloc :: VarName -> VarType -> State Context MemoryIndex
 alloc var varType = do
@@ -184,8 +201,7 @@ alloc var varType = do
         else do
             varPos <- use statMemPos
             let numWords = toNumWords varType
-                mayStatMemPos' =
-                    staticMaxMemoryIndex $ unMemoryIndex varPos + fromIntegral numWords
+                mayStatMemPos' = toStaticMemoryIndex $ unMemoryIndex varPos + fromIntegral numWords
             statMemPos .= case mayStatMemPos' of
                 Nothing          -> error "Out of Miden's memory"
                 Just statMemPos' -> statMemPos'
@@ -360,42 +376,57 @@ transpileUnOp :: UnOp -> [Instruction]
 transpileUnOp NFTypes.Not   = [ MASM.Not   ]
 transpileUnOp NFTypes.IsOdd = [ MASM.IsOdd ]
 
+-- | An expression representing the top element of the stack.
+onStack :: Expr (State Context [Instruction]) a
+onStack = assembly $ pure []
+
+-- | Decorate an expression with effectful computations returning pre- and post-assembly.
 decorateM
     :: asm ~ State Context [Instruction]
     => asm -> Expr asm a -> asm -> Expr asm b
 decorateM asmPre expr asmPost = assembly $ foldA [asmPre, transpile expr, asmPost]
 
+-- | Decorate an expression with pre- and post-assembly.
 decorate
     :: asm ~ State Context [Instruction]
     => [Instruction] -> Expr asm a -> [Instruction] -> Expr asm b
 decorate asmPre expr asmPost = decorateM (pure asmPre) expr (pure asmPost)
 
-deref :: asm ~ State Context [Instruction]  => Expr asm Felt -> Expr asm Felt
+-- | Dereference a Nightfall pointer to a 'Felt'
+deref :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm Felt
 deref ptr = decorate [] ptr [MemLoad Nothing]
 
+-- | Dereference a Nightfall pointer to a 'MidenWord'.
 derefw :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm MidenWord
 derefw ptr = decorate [Padw] ptr [MemLoadw Nothing]
 
+-- | Dereference a Nightfall pointer to a 'Word256'.
 deref256 :: asm ~ State Context [Instruction] => Expr asm Felt -> Expr asm Word256
 deref256 ptr = decorate [] (derefw ptr) [Padw]
 
-onStack :: Expr (State Context [Instruction]) a
-onStack = assembly $ pure []
-
+-- TODO: @counter1@ and @counter2@ are ridiculous names. We should either having scoping or
+-- shadowing or an ability to generate a fresh name out of the given text or all of that.
+-- | Store a 'Natural' in free memory, given the number of 'Felt's to take off of the stack
+-- (there are no limitations on what that number can be).
 storeNat :: asm ~ State Context [Instruction] => Expr asm Felt -> Body asm ()
 storeNat i = do
     let dynPtr = Syntax.Binding Syntax.Felt dynPtrName
     elPtr <- Syntax.declare "elPtr" $ Syntax.get dynPtr + i
     Syntax.set dynPtr $ Syntax.get elPtr + 1
+    -- Store limbs one by one in memory starting with the last one (limbs are stored in big-endian
+    -- on the stack and little-endian in memory).
     repeatDynamic "counter2" i $ do
         ret $ Syntax.get elPtr
         ret . assembly $ pure [MemStorew Nothing, Dropw]
         Syntax.set elPtr $ Syntax.get elPtr - 1
+    -- Store the number of limbs.
     ret i
     ret $ Syntax.get elPtr
     ret . assembly $ pure [MemStore Nothing]
+    -- Put the pointer to the natural onto the stack.
     ret $ Syntax.get elPtr
 
+-- | Load a 'Natural' from memory onto the stack, taking the pointer to the natural from the stack.
 loadNat :: Body (State Context [Instruction]) ()
 loadNat = do
     natPtr <- Syntax.declare "natPtr2" onStack
@@ -415,26 +446,39 @@ transpileBinOp NFTypes.IMax32 = pure [MASM.IMax]
 transpileBinOp NFTypes.Add256 = do
     importExt %= Set.insert "std::math::u256"
     pure [MASM.IAdd256]
+-- TODO: this should be a Nightfall function. As well as 'storeNat', 'loadNat' etc.
 transpileBinOp NFTypes.AddNat = transpile $ do
     yPtr <- Syntax.declare "yPtr" onStack
     xPtr <- Syntax.declare "xPtr" onStack
     ySize <- Syntax.declare "ySize" . deref $ Syntax.get yPtr
     xSize <- Syntax.declare "xSize" . deref $ Syntax.get xPtr
-    i <- Syntax.declare "i" 1
+    -- The size of the resulting natural initialized at @1@.
+    zSize <- Syntax.declare "i" 1
+    -- Store a 128-bit @carry@ variable tracking 128-bit overflows on the stack. After each loop
+    -- iteration it's a Miden Word that is equal to either 0 or 1.
     ret . assembly $ pure [Padw]  -- @carry@
     repeatDynamic "counter1" (binOp IMax32 (Syntax.get xSize) (Syntax.get ySize)) $ do
+        -- Pad the 128-bit @carry@ to 256 bit.
         ret . assembly $ pure [Padw]
-        simpleIf (Syntax.get i `lte` Syntax.get xSize) $
-           ret $ add256 (deref256 $ Syntax.get xPtr + Syntax.get i) onStack
-        simpleIf (Syntax.get i `lte` Syntax.get ySize) $
-           ret $ add256 (deref256 $ Syntax.get yPtr + Syntax.get i) onStack
-        Syntax.set i $ Syntax.get i + 1
+        -- If @x@ still has limbs, then add the current one to @carry@.
+        simpleIf (Syntax.get zSize `lte` Syntax.get xSize) $
+           ret $ add256 (deref256 $ Syntax.get xPtr + Syntax.get zSize) onStack
+        -- If @y@ still has limbs, then add the current one to @carry@.
+        simpleIf (Syntax.get zSize `lte` Syntax.get ySize) $
+           ret $ add256 (deref256 $ Syntax.get yPtr + Syntax.get zSize) onStack
+        -- Increase the size of the resulting natural.
+        Syntax.set zSize $ Syntax.get zSize + 1
+    -- Drop the 3 zeroes of @carry@.
     ret . assembly $ pure [Drop, Drop, Drop]
+    -- If what remains on the stack is 1
     ifElse onStack
+        -- then we had an overflow and need to restore the zeroes, because they and 1 will be
+        -- stored in memory.
         (ret . assembly $ pure [Push [1, 0, 0, 0]])
-        (Syntax.set i $ Syntax.get i - 1)
-    storeNat $ Syntax.get i
-
+        -- Otherwise there was no overflow and the size of the result needs to be decreased.
+        (Syntax.set zSize $ Syntax.get zSize - 1)
+    -- Move all of the computed limbs from stack to memory.
+    storeNat $ Syntax.get zSize
 transpileBinOp Equal          = pure [MASM.Eq Nothing]
 transpileBinOp Lower          = pure [MASM.Lt]
 transpileBinOp LowerEq        = pure [MASM.Lte]
@@ -444,23 +488,29 @@ transpileBinOp GreaterEq      = pure [MASM.Gte]
 transpileLiteral :: Literal -> State Context [Instruction]
 transpileLiteral (LiteralFelt x) = return . singleton $ Push [x]
 transpileLiteral (LiteralBool b) = return . singleton $ Push [if b then 1 else 0]
+-- TODO: should be a Nightfall function too? Should be defined in terms of 'storeNat'?
 transpileLiteral (LiteralNat nat) = do
+    -- Instructions to initialize the pointer to the dynamic memory, if it's not already.
     instrsInitDynPtr <- use mayDynMemPtr >>= \case
         Just _  -> pure []
         Nothing -> do
             dynPtr <- use statMemPos
             mayDynMemPtr ?= dynPtr
             transpileNoAsm $ DeclVariable VarFelt dynPtrName . unExpr $ lit dynamicMemoryHead
+    -- Instructions to get the value of the pointer to the dynamic memory.
     instrsGetDynPtr <- transpileNoAsm $ Var dynPtrName
+    -- Instructions to increase the value of the pointer to the dynamic memory.
     instrsIncDynPtr <- transpileNoAsm . AssignVar dynPtrName $
         BinOp NFTypes.Add (Var dynPtrName) (Literal $ LiteralFelt 1)
     let natWords = naturalToMidenWords nat
+        -- Instructions to store the size of the natural.
         instrsSize = concat
             [ [Push [fromIntegral $ length natWords]]
             , instrsGetDynPtr
             , [MemStore Nothing]
             , instrsIncDynPtr
             ]
+        -- Instructions to store the limbs of the natural.
         instrsLimbs = do
             mword <- natWords
             -- TODO: this can be optimized, we don't really need to update 'dynPtr' in memory at

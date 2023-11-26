@@ -22,7 +22,8 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import qualified Data.Map as Map
 
--- | A list of ranges: @[(0, 10), (11, 100), (101, 1000), ... (10^n + 1, highest)]@ for @base = 10@.
+-- | A list of ranges: @[(0, 10), (11, 100), (101, 1000), ... (10^n + 1, highest)]@ when
+-- @base = 10@.
 magnitudesPositive :: (Num a, Integral a, Ord a) => a -> a -> [(a, a)]
 magnitudesPositive base highest =
     zipWith (\low high -> (low + 1, high)) borders (tail borders)
@@ -37,6 +38,11 @@ arbitraryPositive base highest =
   where
     freqs = map floor $ iterate (* 1.3) (2 :: Double)
 
+-- | Same as 'shrinkIntegral' except includes the square root of the given number (or of its
+-- negative if the number is negative, in which case the square root is negated too) and reorders
+-- the shrinks a bit. We need the former because 'shrinkIntegral' at most divides the number by two,
+-- which makes the number smaller way too slow, hence we add square root to speed up the process.
+--
 -- >>> shrinkIntegralFast (0 :: Integer)
 -- []
 -- >>> shrinkIntegralFast (1 :: Integer)
@@ -44,13 +50,13 @@ arbitraryPositive base highest =
 -- >>> shrinkIntegralFast (9 :: Integer)
 -- [0,3,5,7,8]
 -- >>> shrinkIntegralFast (-10000 :: Integer)
--- [0,-100,-5000,-7500,-8750,-9375,-9688,-9844,-9922,-9961,-9981,-9991,-9996,-9998,-9999,10000]
+-- [0,-100,10000,-5000,-7500,-8750,-9375,-9688,-9844,-9922,-9961,-9981,-9991,-9996,-9998,-9999]
 shrinkIntegralFast :: Integral a => a -> [a]
 shrinkIntegralFast x = concat
     [ [0 | x /= 0]
     , [signum x * floor (sqrt @Double $ fromIntegral xA) | let xA = abs x, xA > 4]
-    , drop 1 . map (x -) . takeWhile (/= 0) $ iterate (`quot` 2) x
     , [-x | x < 0]
+    , drop 1 . map (x -) . takeWhile (/= 0) $ iterate (`quot` 2) x
     ]
 
 -- >>> import Nightfall.Lang.Internal.Types
@@ -66,6 +72,7 @@ instance Arbitrary a => Arbitrary (MidenWordOf a) where
     shrink (MidenWord x0 x1 x2 x3) =
         shrink (x0, x1, x2, x3) <&> \(x0', x1', x2', x3') -> MidenWord x0' x1' x2' x3'
 
+-- | A 128-bit 'Limb' of a 'Natural'.
 newtype Limb = Limb
     { unLimb :: MidenWord
     }
@@ -129,26 +136,28 @@ test_initSetGet =
                 pure $ if i == j then x === y else fromIntegral j === y .&&. x =/= y
             Right _ -> fail "Wrong number of outputs"
 
-test_initLoadAll :: TestTree
-test_initLoadAll =
-    let name = "initLoadAll"
+test_initStoreAll :: TestTree
+test_initStoreAll =
+    let name = "initStoreAll"
     in testProperty name $ \(xs :: [Word64]) -> withMaxSuccess 50 . monadicIO $ do
         let inputs = map fromIntegral xs
             numWords = genericLength inputs
             inputsAsWords = padFeltsAsMidenWords inputs
             hashModule = toHashModule (fromIntegral numWords) inputsAsWords
-            loadAll = Program $ concat
+            storeAll = Program $ concat
                 [ replicate 5 Drop
                 , map (MemLoad . Just . unsafeToMemoryIndex) [0 .. numWords - 1]
                 ]
-        -- Load the inputs into memory using 'toHashModule', then drop what's on the stack, then put
-        -- all the loaded inputs onto the stack one by one.
+        -- Put the inputs into memory using 'toHashModule', then drop what's on the stack, then load
+        -- all the stored inputs onto the stack one by one.
         errOrRes <- liftIO . runMiden DontKeep (Just $ fromIntegral numWords) $
-            hashModule & moduleProg <>~ loadAll
+            hashModule & moduleProg <>~ storeAll
         case errOrRes of
             Left err      -> fail err
             Right outputs -> pure $ inputs === reverse outputs
 
+-- | Test that a Miden Word is stored in little-endian in Miden memory by putting it into memory and
+-- peeking at its first 'Felt'.
 test_wordIsLitteEndianInMemory :: TestTree
 test_wordIsLitteEndianInMemory =
     testProperty "wordIsLitteEndianInMemory" $ \(midenWord :: MidenWord) -> monadicIO $ do
@@ -164,6 +173,7 @@ test_wordIsLitteEndianInMemory =
             Right []       -> fail "'runMiden' returned an empty stack"
             Right (x0 : _) -> pure $ x0 === _midenWord0 midenWord
 
+-- | A wrapper around 'Natural' whose 'Arbitrary' instance produced.
 newtype HugeNatural = HugeNatural Natural
     deriving (Show)
 
@@ -178,40 +188,57 @@ instance Arbitrary HugeNatural where
             pure $ 2 ^ powerOf2 * coeff
         pure . HugeNatural . fromIntegral $ sum addendums
 
-    -- By default at each shrink QuickCheck at most divides the number by two, which makes the
-    -- number smaller way too slow. We add square root to speed up the process.
     shrink = coerce . shrinkIntegralFast . unHugeNatural
 
-test_naturalToMidenWords :: TestTree
-test_naturalToMidenWords =
-    testProperty "naturalToMidenWords" . withMaxSuccess 10000 $ \(HugeNatural n) ->
+-- | Test that 'midenWordsToNatural' cancels 'naturalToMidenWords'.
+test_cancelNaturalToMidenWords :: TestTree
+test_cancelNaturalToMidenWords =
+    testProperty "cancelNaturalToMidenWords" . withMaxSuccess 10000 $ \(HugeNatural n) ->
         n === midenWordsToNatural (naturalToMidenWords n)
 
+-- | Test that 'naturalToMidenWords' cancels 'midenWordsToNatural'.
+test_cancelMidenWordsToNatural :: TestTree
+test_cancelMidenWordsToNatural =
+    testProperty "cancelMidenWordsToNatural" . withMaxSuccess 2000 $ \prews ->
+        let ws = dropWhileEnd (== MidenWord 0 0 0 0) $ map unLimb prews
+            res = naturalToMidenWords (midenWordsToNatural ws)
+        in res === if null ws then [MidenWord 0 0 0 0] else ws
+
+-- | Shrink a single element of the given list without shrinking the spine.
 shrinkOne :: Arbitrary a => [a] -> [[a]]
 shrinkOne []     = []
 shrinkOne (x:xs) = [x':xs | x' <- shrink x] ++ [x:xs' | xs' <- shrinkOne xs]
 
+-- | Test that assigning a 'Natural' to a variable results in that natural being stored in memory.
 test_setNatural :: TestTree
 test_setNatural =
     let name = "setNatural"
     in testProperty name . withMaxSuccess 20 $
+        -- How many naturals to store in memory.
         forAll (chooseInt (1, 6)) $ \natsLen ->
+        -- Which one to test. We don't test all, bevause that would be too slow. And we don't just
+        -- store one in the first place, because we want to test that storing many doesn't result in
+        -- memory corruption.
         forAllShrink (chooseInt (0, natsLen - 1)) shrink $ \target ->
         forAllShrink (vectorOf natsLen arbitrary) shrinkOne $ \hugeNats -> do
             let nats = map unHugeNatural hugeNats
+                -- A program assigning a bunch of naturals to variables.
                 prog = mkSimpleProgram name $
                     for_ (zip [0 :: Int ..] nats) $ \(i, n) ->
                         statement . DeclVariable VarNat ("n" ++ show i) . unExpr $ lit n
                 (masm, _) = runState (transpileZKProgram prog) defaultContext
+                -- An offset in memory at which the natural that we chose starts.
                 offset = dynamicMemoryHead +
                     sum (map (succ . genericLength . naturalToMidenWords) $ take target nats)
                 midenWords = naturalToMidenWords $ nats !! target
+                -- Test that the number of limbs of the chosen natural is stored correctly.
                 propSize = monadicIO $ do
                     errOrRes <- liftIO . runMiden DontKeep (Just 1) $ masm & moduleProg <>~
                         Program [MemLoad . toMemoryIndex $ unFelt offset]
                     case errOrRes of
                         Left err      -> fail err
                         Right outputs -> pure $ [fromIntegral $ length midenWords] === outputs
+                -- Test that each limn of the chosen natural is stored correctly.
                 propLimbs = zip [0 ..] midenWords <&> \(limbNum, midenWord) -> monadicIO $ do
                     errOrRes <- liftIO . runMiden DontKeep (Just 4) $ masm & moduleProg <>~
                         Program [MemLoadw . toMemoryIndex . unFelt $ offset + 1 + limbNum]
@@ -220,13 +247,14 @@ test_setNatural =
                         Right outputs -> pure $ midenWordToFelts midenWord === reverse outputs
             conjoin $ propSize : propLimbs
 
+-- | Test that adding two limbs using 'add256' produces the correct result.
 test_addLimbs :: TestTree
 test_addLimbs =
     let name = "addLimbs"
     in testProperty name . withMaxSuccess 110 $ \(Limb mword1) (Limb mword2) ->
         monadicIO $ do
             let prog = mkSimpleProgramAsm name $
-                    ret $ binOp Add256
+                    ret $ add256
                         (assembly [Push $ midenWordToFelts mword1, Padw])
                         (assembly [Push $ midenWordToFelts mword2, Padw])
             errOrRes <- liftIO $ evalZKProgram (Just 8) prog
@@ -236,7 +264,7 @@ test_addLimbs =
                     let expected = midenWordsToNatural [mword1] + midenWordsToNatural [mword2]
                     pure $ expected === feltsToNatural (reverse outputs)
 
--- TODO: test length too.
+-- | Test that adding two naturals produces the same result in Haskell and Nightfall.
 test_addNats :: TestTree
 test_addNats =
     let name = "addNats"
@@ -244,22 +272,34 @@ test_addNats =
         monadicIO $ do
             let prog = mkSimpleProgramAsm name $ do
                     ret $ addNat (lit nat1) (lit nat2)
+                    -- Save the number of limbs of the result.
+                    ret . assembly $ pure
+                        [ Dup $ unsafeToStackIndex 0
+                        , MemLoad Nothing
+                        , Swap $ unsafeToStackIndex 1
+                        ]
                     loadNat
                 expected = nat1 + nat2
-                numFelts = fromIntegral $ length (naturalToMidenWords expected) * 4
-            errOrRes <- liftIO $ evalZKProgram (Just numFelts) prog
+                numWords = fromIntegral $ length (naturalToMidenWords expected)
+            errOrRes <- liftIO $ evalZKProgram (Just $ numWords * 4 + 1) prog
             case errOrRes of
                 Left err      -> error err
-                Right outputs -> pure $ expected === feltsToNatural (reverse outputs)
+                Right outputs -> case reverse outputs of
+                    []           -> fail "'runMiden' returned an empty stack"
+                    size : felts -> pure $ conjoin
+                        [ fromIntegral numWords === size
+                        , expected === feltsToNatural felts
+                        ]
 
 test_evaluation :: TestTree
 test_evaluation =
     testGroup "Evaluation"
         [ test_initGet
         , test_initSetGet
-        , test_initLoadAll
+        , test_initStoreAll
         , test_wordIsLitteEndianInMemory
-        , test_naturalToMidenWords
+        , test_cancelNaturalToMidenWords
+        , test_cancelMidenWordsToNatural
         , test_setNatural
         , test_addLimbs
         , test_addNats

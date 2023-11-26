@@ -8,7 +8,7 @@ begin
   push.0.0
   exec.mem::pipe_preimage_to_memory
   drop
-  push.1000000
+  push.100000000
   # var __dynPtr
   mem_store.1
   # var __dynPtr (felt)
@@ -49,10 +49,10 @@ begin
   mem_store.0
   # n[0] + n[1] = 5 + 3 = 8
   # an element of 'fakeArr' number
-  push.1000001
+  push.100000001
   mem_load
   # an element of 'fakeArr' number
-  push.1000002
+  push.100000002
   mem_load
   add
 end
