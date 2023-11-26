@@ -61,10 +61,10 @@ data BinOp =
     | Sub     -- ^ @a - b@
     | Mul     -- ^ @a * b@
     | Div     -- ^ @a / b@ (integer division)
-    | IDiv32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
-    | IMax32  -- ^ @a `quot` b@ with @a and b@ being 'Word32'
-    | Add256
-    | AddNat
+    | IDiv32  -- ^ @a `quot` b@ with @a@ and @b@ being 'Word32'
+    | IMax32  -- ^ @a `max` b@ with @a@ and @b@ being 'Word32'
+    | Add256  -- ^ @a + b@ with @a@ and @b@ being 'Word256'
+    | AddNat  -- ^ @a + b@ with @a@ and @b@ being 'Natural'
 
     -- Boolean operations
     | Equal      -- ^ @a == b@
@@ -81,8 +81,11 @@ data Literal =
     deriving (Eq, Show)
 
 -- | Expression, internal type, not exposed
+-- @asm@ is a type of assembly code that can be embedded into an expression. It's not meant to be
+-- used by the user, it's for compiler developers (it's often convenient to use Nightfall while
+-- compiling Nightfall).
 data Expr_ asm =
-      Assembly asm  -- ^ Assembly code. Not useful for users, but useful for compiler developers.
+      Assembly asm
     | Literal Literal
 
     | UnOp UnOp (Expr_ asm)

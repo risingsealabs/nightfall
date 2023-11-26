@@ -71,6 +71,7 @@ dynamicMemoryHead = fromInteger $ 10 ^! 8
 toStaticMemoryIndex :: Integer -> Maybe MemoryIndex
 toStaticMemoryIndex = toMemoryIndexBelow $ unFelt dynamicMemoryHead
 
+-- | The name of the pointer to free dynamic memory.
 dynPtrName :: VarName
 dynPtrName = "__dynPtr"
 
