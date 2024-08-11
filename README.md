@@ -4,6 +4,23 @@
 
 A Haskell eDSL for targeting different zk-VMs.
 
+Major features include non-deterministic loading of arrays from the advice tape and addition of arbitrarily-sized natural numbers.
+
+This function:
+
+```haskell
+\(nat1 :: Natural) (nat2 :: Natural) -> mkSimpleProgramAsm "example" $ do
+    ret $ addNat (lit nat1) (lit nat2)
+    -- Save the number of limbs of the result.
+    ret . assembly $ pure
+        [ Dup $ unsafeToStackIndex 0
+        , MemLoad Nothing
+        , Swap $ unsafeToStackIndex 1
+        ]
+    loadNat
+```
+
+takes two natural numbers of arbitrary size, stores them into Miden's memory, adds them and loads the result onto the stack.
 
 **WARNING**:
 This project is work in progress and subject to frequent changes.
